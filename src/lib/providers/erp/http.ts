@@ -3,6 +3,21 @@ import { ErpProviderError, type DatasetType, type ErpEtaUpdate, type ErpPurchase
 
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error?: { code?: string; message?: string; retryable?: boolean } }
 
+async function fetchApi(input: RequestInfo | URL, init: RequestInit = {}) {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), 15_000)
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ErpProviderError('ERP_API_TIMEOUT', 'ERP API 在 15 秒内没有响应，请检查 Neon 连接串及 Vercel Function 日志。', true, 504)
+    }
+    throw error
+  } finally {
+    window.clearTimeout(timer)
+  }
+}
+
 async function readApiResponse<T>(response: Response): Promise<ApiEnvelope<T>> {
   const text = await response.text()
   if (!text.trim()) throw new ErpProviderError('EMPTY_API_RESPONSE', `ERP API 返回空响应（HTTP ${response.status}）`, true, response.status)
@@ -23,7 +38,7 @@ export class HttpErpLabProvider implements ErpProvider {
 
   private async rpc<T>(operation: string, payload: Record<string, unknown> = {}): Promise<T> {
     const token = sessionStorage.getItem('ezplm:erp-lab:access-token')
-    const response = await fetch('/api/erp', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Tenant-Id': this.tenantId, ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ tenantId: this.tenantId, operation, payload }) })
+    const response = await fetchApi('/api/erp', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Tenant-Id': this.tenantId, ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ tenantId: this.tenantId, operation, payload }) })
     const result = await readApiResponse<T>(response)
     if (!response.ok || !result.ok) {
       const error = result.ok ? undefined : result.error
@@ -33,7 +48,7 @@ export class HttpErpLabProvider implements ErpProvider {
   }
 
   async getDataset(): Promise<SimulatorDataset> {
-    const response = await fetch(`/api/erp?tenantId=${encodeURIComponent(this.tenantId)}`, { cache: 'no-store' })
+    const response = await fetchApi(`/api/erp?tenantId=${encodeURIComponent(this.tenantId)}`, { cache: 'no-store' })
     const result = await readApiResponse<SimulatorDataset>(response)
     if (!response.ok || !result.ok) {
       const error = result.ok ? undefined : result.error
@@ -42,7 +57,7 @@ export class HttpErpLabProvider implements ErpProvider {
     return result.data
   }
   async getHealth(): Promise<{ ok: boolean; service: string; version: string; databaseConfigured: boolean }> {
-    const response = await fetch('/api/health', { cache: 'no-store' })
+    const response = await fetchApi('/api/health', { cache: 'no-store' })
     const text = await response.text()
     try { return JSON.parse(text) }
     catch { throw new ErpProviderError('HEALTH_CHECK_ERROR', `健康检查返回异常（HTTP ${response.status}）`, true, response.status) }
