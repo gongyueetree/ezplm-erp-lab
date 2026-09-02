@@ -53,6 +53,16 @@ DATABASE_URL="postgresql://..." npm run db:deploy
 5. 执行 Network Drop After Commit，使用相同 Idempotency-Key 重试；
 6. 确认 PO 只创建一次且 AuditLog 完整。
 
+## 5. 日常数据维护
+
+- 少量变更：进入“数据维护”，选择物料、库存、Excess、供应商、客户或汇率后新增、编辑、删除；
+- 大批量变更：进入“快照导入”，上传脱敏文件，检查字段映射与 Broken Reference 报告后再提交；
+- Open PO：使用专用的 PO 创建和 ETA 更新流程，保留幂等与审计语义；
+- 基准恢复：仅在测试租户使用“重置 Golden Dataset”；
+- 权限：所有写入均要求 `ERP_LAB_ACCESS_TOKEN`，读取默认公开。
+
+页面只有在 `/api/erp` 成功返回 PostgreSQL 数据后才展示表格。`DATABASE_URL` 缺失或函数异常时会显示配置/诊断页，避免把前端 seed 数据误认为数据库数据。
+
 ## 安全说明
 
 - 当前 API 使用 `tenantId` 作为逻辑隔离键，并使用服务端管理凭证保护全部 POST 操作。

@@ -15,6 +15,8 @@
 - Contract Test、Importer Test、端到端采购测试
 - Vercel 静态部署配置与 GitHub Actions CI
 - PostgreSQL/Prisma 持久化、Vercel Serverless API 与共享租户数据
+- 数据维护工作台：单条新增/编辑/删除、批量 Excel/CSV 导入、引用校验与审计日志
+- 数据库不可用时的明确状态页；不再以浏览器 seed 数据冒充远程数据
 
 > 真实金蝶 Adapter 保持 `WAITING_FOR_DOCUMENTATION`。本仓库没有猜测任何金蝶 endpoint、字段名、认证协议或错误码。
 
@@ -67,6 +69,18 @@ ERP_LAB_ACCESS_TOKEN=<long-random-secret>
 - `MemorySimulatorRepository` 仅供 Contract/E2E 自动化测试使用。
 
 公开访问者只能读取数据。场景切换、导入、重置、PO 和 ETA 写入需要 `ERP_LAB_ACCESS_TOKEN`，凭证只保存在浏览器 `sessionStorage`。
+
+## 数据如何维护
+
+| 场景 | 入口 | 说明 |
+| --- | --- | --- |
+| 日常单条维护 | 数据维护 → 选择数据集 → 新增/编辑/删除 | 适用于物料、库存、Excess、供应商、客户和汇率；服务端校验必填字段、Decimal String 和引用关系 |
+| 批量初始化/更新 | 快照导入 | 浏览器本地解析 Excel/CSV/JSON，人工确认字段映射后写入 PostgreSQL，可选择替换或追加 |
+| 采购单维护 | 数据维护 → Open PO / 总览 → 模拟创建 PO | 创建必须使用 Idempotency-Key；ETA 通过专用操作更新，不走通用记录编辑器 |
+| 恢复标准数据 | 总览 → 重置 Golden Dataset | 覆盖当前租户数据，仅用于测试环境 |
+| 变更追溯 | 请求与审计 | 新增、编辑、删除、导入、PO 与 ETA 写入均可审计 |
+
+通用写入接口当前面向测试环境，采用“读取租户快照 → 校验 → 单事务保存”的方式。多人高频并发维护时，应在正式系统中升级为行级 CRUD、乐观锁和 RBAC。
 
 ## 目录
 

@@ -3,8 +3,8 @@ import {
   Activity, AlertTriangle, ArrowRight, Boxes, Check, ChevronDown, CircleDollarSign,
   ClipboardCheck, CloudCog, Database, Download, FileSpreadsheet, Gauge, History,
   LayoutDashboard, Link2, ListRestart, LoaderCircle, PackageCheck, Play, Plus,
-  RefreshCw, Search, Settings2, ShieldCheck, ShoppingCart, TestTube2,
-  UploadCloud, Users, Warehouse, X, Zap,
+  RefreshCw, Search, Settings2, ShieldCheck, ShoppingCart, TestTube2, Trash2,
+  UploadCloud, Users, Warehouse, X, Zap, Pencil,
 } from 'lucide-react'
 import { HttpErpLabProvider } from './lib/providers/erp/http'
 import { createSeedDataset } from './lib/providers/erp/simulator/seed'
@@ -14,6 +14,7 @@ import type { DatasetType, MappingProfile, ScenarioCode, SimulatorDataset } from
 
 type Page = 'overview' | 'data' | 'import' | 'scenarios' | 'logs' | 'tests'
 type TestResult = { name: string; status: 'running' | 'passed' | 'failed'; detail: string; ms?: number }
+type DataState = 'loading' | 'ready' | 'error'
 
 const tenantId = import.meta.env.VITE_DEFAULT_TENANT || 'ezplm-demo'
 
@@ -25,10 +26,20 @@ function App() {
   const [poOpen, setPoOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [dataState, setDataState] = useState<DataState>('loading')
+  const [loadError, setLoadError] = useState<{ code: string; message: string } | null>(null)
+  const [databaseConfigured, setDatabaseConfigured] = useState<boolean | null>(null)
 
-  const refresh = async () => {
-    try { setDataset(await provider.getDataset()) }
-    catch (error) { notify('error', `数据库未就绪：${(error as Error).message}`) }
+  const refresh = async (showLoading = false) => {
+    if (showLoading) setDataState('loading')
+    try {
+      const remote = await provider.getDataset()
+      setDataset(remote); setDataState('ready'); setLoadError(null); setDatabaseConfigured(true)
+    } catch (error) {
+      const candidate = error as Error & { code?: string }
+      setDataState('error'); setLoadError({ code: candidate.code || 'ERP_API_ERROR', message: candidate.message })
+      try { setDatabaseConfigured((await provider.getHealth()).databaseConfigured) } catch { setDatabaseConfigured(null) }
+    }
   }
   const notify = (type: 'success' | 'error', text: string) => {
     setToast({ type, text })
@@ -37,7 +48,11 @@ function App() {
 
   useEffect(() => {
     let active = true
-    provider.getDataset().then(remote => { if (active) setDataset(remote) }).catch(error => { if (active) setToast({ type: 'error', text: `数据库未就绪：${error.message}` }) })
+    provider.getDataset().then(remote => { if (active) { setDataset(remote); setDataState('ready'); setDatabaseConfigured(true) } }).catch(async error => {
+      if (!active) return
+      setDataState('error'); setLoadError({ code: error.code || 'ERP_API_ERROR', message: error.message })
+      try { const health = await provider.getHealth(); if (active) setDatabaseConfigured(health.databaseConfigured) } catch { if (active) setDatabaseConfigured(null) }
+    })
     return () => { active = false }
   }, [provider])
 
@@ -65,16 +80,18 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar page={page} setPage={setPage} />
+      <Sidebar page={page} setPage={setPage} dataState={dataState} />
       <main className="main-area">
-        <Topbar dataset={dataset} onScenario={() => setPage('scenarios')} onSettings={() => setAuthOpen(true)} authenticated={provider.hasAccessToken()} />
+        <Topbar dataset={dataset} dataState={dataState} onScenario={() => setPage('scenarios')} onSettings={() => setAuthOpen(true)} authenticated={provider.hasAccessToken()} />
         <div className="page-wrap">
-          {page === 'overview' && <Overview dataset={dataset} provider={provider} refresh={refresh} notify={notify} setPage={setPage} reset={reset} exportDataset={exportDataset} setPoOpen={setPoOpen} />}
-          {page === 'data' && <DataExplorer dataset={dataset} />}
-          {page === 'import' && <SnapshotImporter dataset={dataset} provider={provider} refresh={refresh} notify={notify} />}
-          {page === 'scenarios' && <Scenarios dataset={dataset} activate={activateScenario} />}
-          {page === 'logs' && <Logs dataset={dataset} />}
-          {page === 'tests' && <TestConsole provider={provider} dataset={dataset} activate={activateScenario} refresh={refresh} />}
+          {dataState !== 'ready' ? <DatabaseGate state={dataState} error={loadError} databaseConfigured={databaseConfigured} retry={() => refresh(true)} /> : <>
+            {page === 'overview' && <Overview dataset={dataset} provider={provider} refresh={refresh} notify={notify} setPage={setPage} reset={reset} exportDataset={exportDataset} setPoOpen={setPoOpen} />}
+            {page === 'data' && <DataExplorer dataset={dataset} provider={provider} refresh={refresh} notify={notify} setPoOpen={setPoOpen} />}
+            {page === 'import' && <SnapshotImporter dataset={dataset} provider={provider} refresh={refresh} notify={notify} />}
+            {page === 'scenarios' && <Scenarios dataset={dataset} activate={activateScenario} />}
+            {page === 'logs' && <Logs dataset={dataset} />}
+            {page === 'tests' && <TestConsole provider={provider} dataset={dataset} activate={activateScenario} refresh={refresh} />}
+          </>}
         </div>
       </main>
       {poOpen && <CreatePoModal dataset={dataset} provider={provider} close={() => setPoOpen(false)} refresh={refresh} notify={notify} busy={busy} setBusy={setBusy} />}
@@ -84,7 +101,21 @@ function App() {
   )
 }
 
-function Sidebar({ page, setPage }: { page: Page; setPage: (page: Page) => void }) {
+function DatabaseGate({ state, error, databaseConfigured, retry }: { state: DataState; error: { code: string; message: string } | null; databaseConfigured: boolean | null; retry: () => void }) {
+  if (state === 'loading') return <div className="database-gate loading"><LoaderCircle className="spin" size={28} /><h2>正在连接 PostgreSQL</h2><p>正在读取租户数据，请稍候。</p></div>
+  const notConfigured = databaseConfigured === false || error?.code === 'DATABASE_NOT_CONFIGURED'
+  return <div className="database-gate error">
+    <div className="gate-icon"><Database size={26} /></div>
+    <div className="gate-status">{notConfigured ? 'DATABASE NOT CONFIGURED' : 'ERP API UNAVAILABLE'}</div>
+    <h1>{notConfigured ? 'PostgreSQL 尚未连接' : 'ERP 数据服务暂不可用'}</h1>
+    <p>{notConfigured ? '页面不会再显示本地 seed 占位数据。请先在 Vercel 配置 DATABASE_URL 并执行 Prisma migration。' : 'Vercel Function 没有返回有效的 ERP JSON 响应，请检查函数运行日志。'}</p>
+    <div className="gate-detail"><AlertTriangle size={16} /><div><strong>{error?.code || 'CONNECTION_ERROR'}</strong><span>{error?.message || '无法连接 ERP 数据服务'}</span></div></div>
+    <div className="gate-steps"><div><span>1</span><p><strong>连接数据库</strong>配置 Vercel PostgreSQL 的 DATABASE_URL</p></div><div><span>2</span><p><strong>初始化表结构</strong>运行 <code>npm run db:deploy</code></p></div><div><span>3</span><p><strong>配置写入凭证</strong>设置 ERP_LAB_ACCESS_TOKEN</p></div></div>
+    <button className="btn primary" onClick={retry}><RefreshCw size={16} />重新检测</button>
+  </div>
+}
+
+function Sidebar({ page, setPage, dataState }: { page: Page; setPage: (page: Page) => void; dataState: DataState }) {
   const items: { id: Page; label: string; icon: typeof LayoutDashboard; badge?: string }[] = [
     { id: 'overview', label: '总览', icon: LayoutDashboard },
     { id: 'data', label: '数据浏览器', icon: Database },
@@ -98,17 +129,17 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (page: Page) => void 
     <div className="workspace-label">ERP 集成环境</div>
     <nav>{items.map(item => <button key={item.id} className={page === item.id ? 'active' : ''} onClick={() => setPage(item.id)}><item.icon size={18} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>)}</nav>
     <div className="sidebar-spacer" />
-    <div className="lab-status"><div className="pulse-dot" /><div><strong>Simulator 在线</strong><small>PostgreSQL 共享数据 · v2.0</small></div></div>
+    <div className={`lab-status ${dataState !== 'ready' ? 'offline' : ''}`}><div className="pulse-dot" /><div><strong>{dataState === 'ready' ? 'Simulator 在线' : dataState === 'loading' ? '正在连接' : '数据库离线'}</strong><small>PostgreSQL 共享数据 · v2.1</small></div></div>
     <div className="user-card"><div className="avatar">GY</div><div><strong>Gongyu</strong><small>Management</small></div><ChevronDown size={15} /></div>
   </aside>
 }
 
-function Topbar({ dataset, onScenario, onSettings, authenticated }: { dataset: SimulatorDataset; onScenario: () => void; onSettings: () => void; authenticated: boolean }) {
+function Topbar({ dataset, dataState, onScenario, onSettings, authenticated }: { dataset: SimulatorDataset; dataState: DataState; onScenario: () => void; onSettings: () => void; authenticated: boolean }) {
   const meta = SCENARIO_META.find(item => item.code === dataset.scenario.code)
   return <header className="topbar">
     <div className="breadcrumbs"><span>Settings</span><i>/</i><strong>Integrations</strong><i>/</i><b>ERP Sandbox</b></div>
     <div className="top-actions">
-      <button className={`scenario-pill ${dataset.scenario.code !== 'NORMAL' ? 'danger' : ''}`} onClick={onScenario}><span />{meta?.label}<ChevronDown size={14} /></button>
+      <button className={`scenario-pill ${dataState === 'error' || dataset.scenario.code !== 'NORMAL' ? 'danger' : ''}`} onClick={onScenario} disabled={dataState !== 'ready'}><span />{dataState === 'ready' ? meta?.label : dataState === 'loading' ? '连接中' : '数据库离线'}<ChevronDown size={14} /></button>
       <div className="tenant"><span>租户</span><strong>{dataset.tenantId}</strong></div>
       <button className={`icon-btn ${authenticated ? 'authenticated' : ''}`} onClick={onSettings} title="管理访问凭证"><Settings2 size={18} /></button>
     </div>
@@ -167,18 +198,59 @@ const datasetTabs: { id: DatasetType; label: string; field: keyof SimulatorDatas
   { id: 'FX', label: '汇率', field: 'exchangeRates' },
 ]
 
-function DataExplorer({ dataset }: { dataset: SimulatorDataset }) {
+type MaintainableType = Exclude<DatasetType, 'OPEN_PO'>
+
+function maintenanceKey(type: MaintainableType, row: Record<string, unknown>) {
+  return type === 'FX' ? [row.baseCurrency, row.quoteCurrency, row.effectiveDate].join('|') : String(row.externalId || '')
+}
+
+function DataExplorer({ dataset, provider, refresh, notify, setPoOpen }: { dataset: SimulatorDataset; provider: HttpErpLabProvider; refresh: () => Promise<void>; notify: (type: 'success' | 'error', text: string) => void; setPoOpen: (open: boolean) => void }) {
   const [active, setActive] = useState<DatasetType>('MATERIAL')
   const [search, setSearch] = useState('')
+  const [editing, setEditing] = useState<{ record: Record<string, unknown>; originalKey?: string } | null>(null)
   const tab = datasetTabs.find(item => item.id === active)!
   const raw = dataset[tab.field] as unknown[]
   const rows = raw.filter(row => JSON.stringify(row).toLowerCase().includes(search.toLowerCase())) as Record<string, any>[]
   const columns = rows.length ? Object.keys(rows[0]).filter(key => !['lines', 'idempotencyKey'].includes(key)).slice(0, 8) : []
-  return <><PageHeader eyebrow="DATASET EXPLORER" title="ERP 数据浏览器" text="检查标准化后的 Canonical ERP 数据；所有数量与金额均以 Decimal String 保存。" />
-    <div className="panel data-panel"><div className="data-toolbar"><div className="tab-list">{datasetTabs.map(item => <button className={active === item.id ? 'active' : ''} onClick={() => setActive(item.id)} key={item.id}>{item.label}<em>{(dataset[item.field] as unknown[]).length}</em></button>)}</div><label className="search-box"><Search size={16} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索当前数据集…" /></label></div>
-      <div className="table-wrap"><table><thead><tr>{columns.map(column => <th key={column}>{prettyKey(column)}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index}>{columns.map(column => <td key={column}>{column.includes('status') ? <span className="status-tag">{String(row[column] ?? '—')}</span> : String(row[column] ?? '—')}</td>)}</tr>)}</tbody></table></div>
+  const create = () => {
+    if (active === 'OPEN_PO') { setPoOpen(true); return }
+    const now = new Date().toISOString().slice(0, 10)
+    const defaults: Record<MaintainableType, Record<string, unknown>> = {
+      MATERIAL: { externalId: `MAT-${Date.now()}`, materialCode: '', status: 'ACTIVE', unit: 'PCS' },
+      INVENTORY: { externalId: `INV-${Date.now()}`, materialCode: '', onHandQty: '0', availableQty: '0', reservedQty: '0' },
+      EXCESS: { externalId: `EX-${Date.now()}`, materialCode: '', bookQty: '0', availableQty: '0' },
+      SUPPLIER: { externalId: `SUP-${Date.now()}`, supplierCode: '', name: '', status: 'ACTIVE', currency: 'CNY' },
+      CUSTOMER: { externalId: `CUS-${Date.now()}`, customerCode: '', name: '', status: 'ACTIVE' },
+      FX: { baseCurrency: 'CNY', quoteCurrency: '', rate: '1', rateType: 'SPOT', effectiveDate: now, source: 'MANUAL' },
+    }
+    setEditing({ record: defaults[active] })
+  }
+  const remove = async (row: Record<string, unknown>) => {
+    if (active === 'OPEN_PO' || !window.confirm('确认删除这条共享 PostgreSQL 记录？此操作会写入审计日志。')) return
+    try { await provider.deleteRecord(active, maintenanceKey(active, row)); await refresh(); notify('success', '记录已删除') }
+    catch (error) { notify('error', `${(error as any).code || 'ERROR'} · ${(error as Error).message}`) }
+  }
+  return <><PageHeader eyebrow="DATASET EXPLORER" title="ERP 数据维护" text="在线新增、编辑和删除 Canonical ERP 数据；批量更新请使用快照导入。" action={<button className="btn primary" onClick={create}><Plus size={16} />{active === 'OPEN_PO' ? '创建 PO' : `新增${tab.label}`}</button>} />
+    <div className="maintenance-note"><ShieldCheck size={16} /><span>所有修改均写入 PostgreSQL 并记录 Audit Log；写入操作需要管理凭证。</span><button onClick={() => setSearch('')}>清除筛选</button></div>
+    <div className="panel data-panel"><div className="data-toolbar"><div className="tab-list">{datasetTabs.map(item => <button className={active === item.id ? 'active' : ''} onClick={() => { setActive(item.id); setSearch('') }} key={item.id}>{item.label}<em>{(dataset[item.field] as unknown[]).length}</em></button>)}</div><label className="search-box"><Search size={16} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索当前数据集…" /></label></div>
+      <div className="table-wrap"><table><thead><tr>{columns.map(column => <th key={column}>{prettyKey(column)}</th>)}<th>操作</th></tr></thead><tbody>{rows.map((row, index) => <tr key={maintenanceKey(active === 'OPEN_PO' ? 'MATERIAL' : active, row) || index}>{columns.map(column => <td key={column}>{column.includes('status') ? <span className="status-tag">{String(row[column] ?? '—')}</span> : String(row[column] ?? '—')}</td>)}<td><div className="row-actions">{active === 'OPEN_PO' ? <button onClick={() => setPoOpen(true)}><Pencil size={13} />通过 PO 流程维护</button> : <><button onClick={() => setEditing({ record: { ...row }, originalKey: maintenanceKey(active, row) })}><Pencil size={13} />编辑</button><button className="danger" onClick={() => remove(row)}><Trash2 size={13} />删除</button></>}</div></td></tr>)}</tbody></table>{rows.length === 0 && <EmptyState icon={Database} text="当前数据集没有记录" />}</div>
       <div className="table-footer"><span>显示 {rows.length} / {raw.length} 条记录</span><span>Tenant: <code>{dataset.tenantId}</code></span></div>
-    </div></>
+    </div>
+    {editing && active !== 'OPEN_PO' && <RecordEditorModal type={active} value={editing.record} originalKey={editing.originalKey} provider={provider} close={() => setEditing(null)} refresh={refresh} notify={notify} />}
+  </>
+}
+
+function RecordEditorModal({ type, value, originalKey, provider, close, refresh, notify }: { type: MaintainableType; value: Record<string, unknown>; originalKey?: string; provider: HttpErpLabProvider; close: () => void; refresh: () => Promise<void>; notify: (type: 'success' | 'error', text: string) => void }) {
+  const [record, setRecord] = useState<Record<string, unknown>>(value)
+  const [saving, setSaving] = useState(false)
+  const requiredFields: Record<MaintainableType, string[]> = { MATERIAL: ['externalId', 'materialCode'], INVENTORY: ['externalId', 'materialCode', 'onHandQty'], EXCESS: ['externalId', 'materialCode', 'bookQty', 'availableQty'], SUPPLIER: ['externalId', 'supplierCode', 'name'], CUSTOMER: ['externalId', 'customerCode', 'name'], FX: ['baseCurrency', 'quoteCurrency', 'rate', 'effectiveDate', 'source'] }
+  const save = async () => {
+    setSaving(true)
+    try { await provider.upsertRecord(type, record, originalKey); await refresh(); notify('success', originalKey ? '记录已更新' : '记录已新增'); close() }
+    catch (error) { notify('error', `${(error as any).code || 'ERROR'} · ${(error as Error).message}`) }
+    finally { setSaving(false) }
+  }
+  return <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && close()}><div className="modal record-modal"><div className="modal-head"><div><span><Database size={20} /></span><div><h2>{originalKey ? '编辑' : '新增'} {datasetTabs.find(item => item.id === type)?.label}</h2><p>保存后立即更新共享 PostgreSQL 数据</p></div></div><button onClick={close}><X size={19} /></button></div><div className="modal-body record-fields">{TARGET_FIELDS[type].map(field => <label key={field}>{prettyKey(field)}{requiredFields[type].includes(field) && <b>*</b>}<input type={field.toLowerCase().includes('date') || field.toLowerCase().includes('at') ? 'date' : 'text'} value={String(record[field] ?? '')} onChange={event => setRecord(current => ({ ...current, [field]: event.target.value }))} placeholder={requiredFields[type].includes(field) ? '必填' : '可选'} /></label>)}</div><div className="modal-actions"><button className="btn secondary" onClick={close}>取消</button><button className="btn primary" onClick={save} disabled={saving}>{saving ? <LoaderCircle className="spin" size={16} /> : <Check size={16} />}保存记录</button></div></div></div>
 }
 
 function SnapshotImporter({ dataset, provider, refresh, notify }: any) {
