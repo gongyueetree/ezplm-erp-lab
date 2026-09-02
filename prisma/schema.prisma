@@ -14,6 +14,8 @@ model ErpSimTenant {
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt
   materials        ErpSimMaterial[]
+  manufacturers    ErpSimManufacturer[]
+  warehouses       ErpSimWarehouse[]
   inventory        ErpSimInventory[]
   excess           ErpSimExcess[]
   suppliers        ErpSimSupplier[]
@@ -24,6 +26,35 @@ model ErpSimTenant {
   requestLogs      ErpSimRequestLog[]
   auditLogs        ErpSimAuditLog[]
   mappingProfiles  ErpSimMappingProfile[]
+}
+
+model ErpSimManufacturer {
+  id               String       @id @default(cuid())
+  tenantId         String
+  tenant           ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId       String
+  manufacturerCode String
+  name             String
+  status           String?
+  sourceUpdatedAt  DateTime?
+
+  @@unique([tenantId, externalId])
+  @@unique([tenantId, manufacturerCode])
+  @@unique([tenantId, name])
+}
+
+model ErpSimWarehouse {
+  id              String       @id @default(cuid())
+  tenantId        String
+  tenant          ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId      String
+  warehouseCode   String
+  name            String
+  status          String?
+  sourceUpdatedAt DateTime?
+
+  @@unique([tenantId, externalId])
+  @@unique([tenantId, warehouseCode])
 }
 
 model ErpSimMaterial {
