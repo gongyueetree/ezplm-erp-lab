@@ -1,0 +1,4 @@
+{
+  "scenario": "NORMAL",
+  "expected": { "connection": "READY", "syncStatus": "SYNCED" }
+}

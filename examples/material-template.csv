@@ -1,0 +1,3 @@
+externalId,materialCode,internalPn,manufacturer,mpn,description,unit,status
+MAT-DEMO-001,DEMO-STM32,MCU-DEMO-1,STMicroelectronics,STM32G474RET6,Demo MCU,PCS,ACTIVE
+MAT-DEMO-002,DEMO-ADC,ADC-DEMO-1,Texas Instruments,ADS131M04IPWR,Demo ADC,PCS,ACTIVE

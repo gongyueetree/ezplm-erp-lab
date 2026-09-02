@@ -1,0 +1,4 @@
+{
+  "scenario": "NETWORK_DROP_AFTER_COMMIT",
+  "expected": { "firstAttempt": "RETRY_REQUIRED", "retry": "SYNCED", "poCount": 1, "idempotentReplay": true }
+}

@@ -1,0 +1,4 @@
+{
+  "scenario": "FX_MISSING",
+  "expected": { "syncStatus": "FAILED", "errorCode": "FX_NOT_AVAILABLE" }
+}
