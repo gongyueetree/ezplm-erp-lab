@@ -10,7 +10,7 @@ import type {
   ErpSupplier,
   ErpWriteResult,
   PullOptions,
-} from './types'
+} from './types.js'
 
 export interface ErpProvider {
   testConnection(): Promise<ErpConnectionResult>

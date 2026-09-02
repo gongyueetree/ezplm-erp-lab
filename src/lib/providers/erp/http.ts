@@ -1,5 +1,5 @@
-import type { ErpProvider } from './contracts'
-import { ErpProviderError, type DatasetType, type ErpEtaUpdate, type ErpPurchaseOrder, type ErpSimScenario, type PullOptions, type SimulatorDataset } from './types'
+import type { ErpProvider } from './contracts.js'
+import { ErpProviderError, type DatasetType, type ErpEtaUpdate, type ErpPurchaseOrder, type ErpSimScenario, type PullOptions, type SimulatorDataset } from './types.js'
 
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error?: { code?: string; message?: string; retryable?: boolean } }
 

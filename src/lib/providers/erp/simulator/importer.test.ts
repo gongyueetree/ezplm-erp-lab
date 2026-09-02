@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createSeedDataset } from './seed'
-import { importRows, suggestMappings } from './importer'
+import { createSeedDataset } from './seed.js'
+import { importRows, suggestMappings } from './importer.js'
 
 describe('Snapshot importer', () => {
   it('suggests canonical mappings but requires explicit confirmation', () => {

@@ -1,4 +1,4 @@
-import type { SimulatorDataset } from '../types'
+import type { SimulatorDataset } from '../types.js'
 
 export function createSeedDataset(tenantId: string): SimulatorDataset {
   const now = new Date().toISOString()

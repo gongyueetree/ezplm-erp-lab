@@ -1,7 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { PrismaSimulatorRepository } from '../server/prisma-simulator-repository'
-import { KingdeeSimulatorProvider } from '../src/lib/providers/erp/simulator/index'
-import type { DatasetType, ErpPurchaseOrder, ErpSimScenario, SimulatorDataset } from '../src/lib/providers/erp/types'
+import type { DatasetType, ErpPurchaseOrder, ErpSimScenario, SimulatorDataset } from '../src/lib/providers/erp/types.js'
 
 class ApiError extends Error {
   constructor(public code: string, message: string, public retryable = false, public httpStatus = 500) { super(message) }
@@ -44,6 +42,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!configuredToken) throw new ApiError('ERP_LAB_ACCESS_TOKEN_NOT_CONFIGURED', '服务端尚未配置 ERP_LAB_ACCESS_TOKEN', false, 503)
       if (req.headers.authorization !== `Bearer ${configuredToken}`) throw new ApiError('ERP_LAB_UNAUTHORIZED', '需要有效的 ERP Lab 管理凭证', false, 401)
     }
+    const [{ KingdeeSimulatorProvider }, { PrismaSimulatorRepository }] = await Promise.all([
+      import('../src/lib/providers/erp/simulator/index.js'), import('../server/prisma-simulator-repository.js'),
+    ])
     const provider = new KingdeeSimulatorProvider(new PrismaSimulatorRepository(tenantId))
     if (req.method === 'GET') return res.status(200).json({ ok: true, data: await provider.getDataset() })
     if (req.method !== 'POST') return res.status(405).json({ ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET or POST' } })

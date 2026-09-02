@@ -1,4 +1,4 @@
-import type { DatasetType, ImportReport, MappingProfile, SimulatorDataset } from '../types'
+import type { DatasetType, ImportReport, MappingProfile, SimulatorDataset } from '../types.js'
 
 const requiredFields: Record<DatasetType, string[]> = {
   MATERIAL: ['externalId', 'materialCode'], INVENTORY: ['externalId', 'materialCode', 'onHandQty'],

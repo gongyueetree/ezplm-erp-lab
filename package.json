@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vercel dev",
     "dev:web": "vite",
-    "build": "prisma generate && tsc -b && tsc --noEmit -p tsconfig.server.json && vite build",
+    "build": "prisma generate && tsc -b && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.runtime.json && vite build",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

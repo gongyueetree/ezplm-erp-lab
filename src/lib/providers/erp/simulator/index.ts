@@ -1,4 +1,4 @@
-import type { ErpProvider } from '../contracts'
+import type { ErpProvider } from '../contracts.js'
 import type {
   AuditEntry,
   ErpCustomer,
@@ -14,10 +14,10 @@ import type {
   ErpWriteResult,
   PullOptions,
   SimulatorDataset,
-} from '../types'
-import { ErpProviderError } from '../types'
-import type { SimulatorRepository } from './repository'
-import { beforeOperation } from './scenario-engine'
+} from '../types.js'
+import { ErpProviderError } from '../types.js'
+import type { SimulatorRepository } from './repository.js'
+import { beforeOperation } from './scenario-engine.js'
 
 const uid = () => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
 const clone = <T,>(value: T): T => structuredClone(value)

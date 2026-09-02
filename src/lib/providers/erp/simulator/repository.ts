@@ -1,5 +1,5 @@
-import { createSeedDataset } from './seed'
-import type { SimulatorDataset } from '../types'
+import { createSeedDataset } from './seed.js'
+import type { SimulatorDataset } from '../types.js'
 
 export interface SimulatorRepository {
   load(): Promise<SimulatorDataset>

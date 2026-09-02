@@ -1,5 +1,5 @@
-import type { ErpProvider } from '../contracts'
-import { ErpProviderError } from '../types'
+import type { ErpProvider } from '../contracts.js'
+import { ErpProviderError } from '../types.js'
 
 const notReady = (): never => {
   throw new ErpProviderError('WAITING_FOR_DOCUMENTATION', '尚未提供金蝶 K3 云星空接口文档、认证方式与字段映射；真实 Provider 未启用。', false, 501)

@@ -1,8 +1,8 @@
-import type { ErpProvider } from './contracts'
-import { ErpProviderError } from './types'
-import { KingdeeK3CloudProvider } from './kingdee'
-import { KingdeeSimulatorProvider } from './simulator'
-import type { SimulatorRepository } from './simulator/repository'
+import type { ErpProvider } from './contracts.js'
+import { ErpProviderError } from './types.js'
+import { KingdeeK3CloudProvider } from './kingdee/index.js'
+import { KingdeeSimulatorProvider } from './simulator/index.js'
+import type { SimulatorRepository } from './simulator/repository.js'
 
 class NotConfiguredProvider implements ErpProvider {
   private fail = async (): Promise<never> => { throw new ErpProviderError('ERP_NOT_CONFIGURED', 'ERP Provider 尚未配置', false, 503) }

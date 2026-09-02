@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import handler from './erp'
+import handler from './erp.js'
 
 describe('ERP API bootstrap', () => {
   const originalDatabaseUrl = process.env.DATABASE_URL
@@ -9,7 +9,7 @@ describe('ERP API bootstrap', () => {
     else process.env.DATABASE_URL = originalDatabaseUrl
   })
 
-  it('returns a JSON configuration error without querying Prisma', async () => {
+  it('returns a JSON configuration error before loading Prisma', async () => {
     delete process.env.DATABASE_URL
     let status = 0
     let body: unknown

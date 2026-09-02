@@ -1,8 +1,8 @@
 import { Prisma, type PrismaClient } from '@prisma/client'
-import type { SimulatorRepository } from '../src/lib/providers/erp/simulator/repository'
-import { createSeedDataset } from '../src/lib/providers/erp/simulator/seed'
-import type { ScenarioCode, SimulatorDataset } from '../src/lib/providers/erp/types'
-import { prisma } from './prisma'
+import type { SimulatorRepository } from '../src/lib/providers/erp/simulator/repository.js'
+import { createSeedDataset } from '../src/lib/providers/erp/simulator/seed.js'
+import type { ScenarioCode, SimulatorDataset } from '../src/lib/providers/erp/types.js'
+import { prisma } from './prisma.js'
 
 const iso = (value: Date | null | undefined) => value?.toISOString()
 const date = (value?: string) => value ? new Date(value) : null

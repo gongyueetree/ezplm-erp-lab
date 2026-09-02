@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { KingdeeSimulatorProvider } from '.'
-import { MemorySimulatorRepository } from './repository'
+import { MemorySimulatorRepository } from './repository.js'
 
 const makeProvider = () => new KingdeeSimulatorProvider(new MemorySimulatorRepository('test-tenant'))
 

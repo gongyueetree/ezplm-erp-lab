@@ -1,5 +1,5 @@
-import { ErpProviderError } from '../types'
-import type { ErpSimScenario } from '../types'
+import { ErpProviderError } from '../types.js'
+import type { ErpSimScenario } from '../types.js'
 
 export const SCENARIO_META = [
   { code: 'NORMAL', label: '正常模式', description: '所有接口正常响应', tone: 'green' },
