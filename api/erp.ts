@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { PrismaSimulatorRepository } from '../server/prisma-simulator-repository'
 import { KingdeeSimulatorProvider } from '../src/lib/providers/erp/simulator'
 import { ErpProviderError, type ErpPurchaseOrder, type ErpSimScenario, type SimulatorDataset } from '../src/lib/providers/erp/types'
 
@@ -8,12 +7,14 @@ const tenantFrom = (req: VercelRequest) => String(req.query.tenantId || req.body
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store')
   try {
+    if (!process.env.DATABASE_URL) throw new ErpProviderError('DATABASE_NOT_CONFIGURED', '服务端尚未配置 DATABASE_URL，请先连接 PostgreSQL 并执行 Prisma migration。', false, 503)
     const tenantId = tenantFrom(req)
     if (req.method === 'POST' && process.env.NODE_ENV === 'production') {
       const configuredToken = process.env.ERP_LAB_ACCESS_TOKEN
       if (!configuredToken) throw new ErpProviderError('ERP_LAB_ACCESS_TOKEN_NOT_CONFIGURED', '服务端尚未配置 ERP_LAB_ACCESS_TOKEN', false, 503)
       if (req.headers.authorization !== `Bearer ${configuredToken}`) throw new ErpProviderError('ERP_LAB_UNAUTHORIZED', '需要有效的 ERP Lab 管理凭证', false, 401)
     }
+    const { PrismaSimulatorRepository } = await import('../server/prisma-simulator-repository')
     const provider = new KingdeeSimulatorProvider(new PrismaSimulatorRepository(tenantId))
     if (req.method === 'GET') return res.status(200).json({ ok: true, data: await provider.getDataset() })
     if (req.method !== 'POST') return res.status(405).json({ ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET or POST' } })
