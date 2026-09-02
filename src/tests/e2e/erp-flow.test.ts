@@ -15,8 +15,8 @@ describe('ERP-E2E · procurement flow', () => {
     expect(created.success).toBe(true)
 
     await provider.updateEta({ poExternalId: created.externalId, lineNo: 1, confirmedQty: '250', eta: '2026-09-18' })
-    const saved = provider.getDataset().purchaseOrders.find(po => po.externalId === created.externalId)
+    const saved = (await provider.getDataset()).purchaseOrders.find(po => po.externalId === created.externalId)
     expect(saved?.lines[0].eta).toBe('2026-09-18')
-    expect(provider.getDataset().auditLogs.map(log => log.action)).toEqual(expect.arrayContaining(['CREATE_PO', 'UPDATE_ETA']))
+    expect((await provider.getDataset()).auditLogs.map(log => log.action)).toEqual(expect.arrayContaining(['CREATE_PO', 'UPDATE_ETA']))
   })
 })

@@ -2,9 +2,9 @@ import { createSeedDataset } from './seed'
 import type { SimulatorDataset } from '../types'
 
 export interface SimulatorRepository {
-  load(): SimulatorDataset
-  save(dataset: SimulatorDataset): void
-  reset(): SimulatorDataset
+  load(): Promise<SimulatorDataset>
+  save(dataset: SimulatorDataset): Promise<void>
+  reset(): Promise<SimulatorDataset>
 }
 
 export class MemorySimulatorRepository implements SimulatorRepository {
@@ -14,9 +14,9 @@ export class MemorySimulatorRepository implements SimulatorRepository {
     this.dataset = structuredClone(initial ?? createSeedDataset(tenantId))
   }
 
-  load() { return structuredClone(this.dataset) }
-  save(dataset: SimulatorDataset) { this.dataset = structuredClone(dataset) }
-  reset() {
+  async load() { return structuredClone(this.dataset) }
+  async save(dataset: SimulatorDataset) { this.dataset = structuredClone(dataset) }
+  async reset() {
     this.dataset = createSeedDataset(this.tenantId)
     return this.load()
   }
@@ -29,7 +29,7 @@ export class BrowserSimulatorRepository implements SimulatorRepository {
     this.key = `ezplm:erp-lab:v1:${tenantId}`
   }
 
-  load(): SimulatorDataset {
+  async load(): Promise<SimulatorDataset> {
     const raw = localStorage.getItem(this.key)
     if (!raw) return this.reset()
     try {
@@ -41,14 +41,14 @@ export class BrowserSimulatorRepository implements SimulatorRepository {
     }
   }
 
-  save(dataset: SimulatorDataset) {
+  async save(dataset: SimulatorDataset) {
     if (dataset.tenantId !== this.tenantId) throw new Error('Tenant isolation violation')
     localStorage.setItem(this.key, JSON.stringify(dataset))
   }
 
-  reset() {
+  async reset() {
     const dataset = createSeedDataset(this.tenantId)
-    this.save(dataset)
+    await this.save(dataset)
     return dataset
   }
 }

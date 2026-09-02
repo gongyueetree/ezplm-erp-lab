@@ -14,6 +14,7 @@
 - 请求日志、映射健康度、Golden Dataset、数据导出与重置
 - Contract Test、Importer Test、端到端采购测试
 - Vercel 静态部署配置与 GitHub Actions CI
+- PostgreSQL/Prisma 持久化、Vercel Serverless API 与共享租户数据
 
 > 真实金蝶 Adapter 保持 `WAITING_FOR_DOCUMENTATION`。本仓库没有猜测任何金蝶 endpoint、字段名、认证协议或错误码。
 
@@ -21,6 +22,8 @@
 
 ```bash
 npm install
+cp .env.example .env
+npm run db:deploy
 npm run dev
 ```
 
@@ -44,23 +47,26 @@ npm run build
 - Output Directory: `dist`
 - Node.js: `22.x`
 
-无需凭据即可运行 Simulator。可选环境变量：
+Vercel 项目需要配置两个服务端环境变量：
 
 ```env
-VITE_ERP_PROVIDER=simulator
-VITE_DEFAULT_TENANT=ezplm-demo
+DATABASE_URL=postgresql://...
+ERP_LAB_ACCESS_TOKEN=<long-random-secret>
 ```
+
+然后对目标数据库执行 `npm run db:deploy`。完整步骤见 [`docs/POSTGRESQL_DEPLOYMENT.md`](docs/POSTGRESQL_DEPLOYMENT.md)。
 
 ## 数据持久化说明
 
-当前在线演示版采用 `BrowserSimulatorRepository`：
+运行路径采用 `PrismaSimulatorRepository`：
 
-- 数据保存在当前浏览器的 `localStorage`；
-- storage key 包含 `tenantId`，不同租户逻辑隔离；
-- 不上传客户快照，适合独立演示、产品评审和故障链路验证；
-- 不适合多人共享数据、长期 UAT 或生产使用。
+- 浏览器通过同源 `/api/erp` 调用 Vercel Serverless Function；
+- 数据保存在 PostgreSQL，多个浏览器共享同一租户数据；
+- 每张 Simulator 表都包含 `tenantId` 并建立组合唯一键或索引；
+- 数量、价格和汇率在 PostgreSQL 中使用 `DECIMAL`，Canonical API 返回 Decimal String；
+- `MemorySimulatorRepository` 仅供 Contract/E2E 自动化测试使用。
 
-进入多人测试阶段时，实现同一 `SimulatorRepository` 的 PostgreSQL/Prisma 版本即可，Provider、UI 和 Contract Test 不需要重写。
+公开访问者只能读取数据。场景切换、导入、重置、PO 和 ETA 写入需要 `ERP_LAB_ACCESS_TOKEN`，凭证只保存在浏览器 `sessionStorage`。
 
 ## 目录
 
@@ -76,6 +82,11 @@ src/lib/providers/erp/
     ├── scenario-engine.ts   # Failure Injection
     ├── importer.ts          # Snapshot Mapping / Validation
     └── seed.ts              # Golden Dataset
+server/
+├── prisma.ts                # Prisma Client singleton
+└── prisma-simulator-repository.ts
+api/erp.ts                   # Vercel Serverless API
+prisma/                      # Schema + migrations
 ```
 
 ## 安全边界
@@ -86,5 +97,6 @@ src/lib/providers/erp/
 - PO 写入必须带 Idempotency-Key；
 - 真实 ERP credential 未来只能保存在服务端环境变量；
 - 生产环境不得开放 Simulator Reset/Seed。
+- PostgreSQL 和管理凭证不会打包进浏览器 JavaScript。
 
 完整的实施前审计见 [`docs/ERP_LAB_IMPLEMENTATION_AUDIT.md`](docs/ERP_LAB_IMPLEMENTATION_AUDIT.md)。

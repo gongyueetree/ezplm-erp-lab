@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   Activity, AlertTriangle, ArrowRight, Boxes, Check, ChevronDown, CircleDollarSign,
   ClipboardCheck, CloudCog, Database, Download, FileSpreadsheet, Gauge, History,
@@ -6,8 +6,8 @@ import {
   RefreshCw, Search, Settings2, ShieldCheck, ShoppingCart, TestTube2,
   UploadCloud, Users, Warehouse, X, Zap,
 } from 'lucide-react'
-import { BrowserSimulatorRepository } from './lib/providers/erp/simulator/repository'
-import { KingdeeSimulatorProvider } from './lib/providers/erp/simulator'
+import { HttpErpLabProvider } from './lib/providers/erp/http'
+import { createSeedDataset } from './lib/providers/erp/simulator/seed'
 import { SCENARIO_META } from './lib/providers/erp/simulator/scenario-engine'
 import { importRows, suggestMappings, TARGET_FIELDS } from './lib/providers/erp/simulator/importer'
 import type { DatasetType, MappingProfile, ScenarioCode, SimulatorDataset } from './lib/providers/erp/types'
@@ -18,29 +18,38 @@ type TestResult = { name: string; status: 'running' | 'passed' | 'failed'; detai
 const tenantId = import.meta.env.VITE_DEFAULT_TENANT || 'ezplm-demo'
 
 function App() {
-  const repository = useMemo(() => new BrowserSimulatorRepository(tenantId), [])
-  const provider = useMemo(() => new KingdeeSimulatorProvider(repository), [repository])
-  const [dataset, setDataset] = useState<SimulatorDataset>(() => provider.getDataset())
+  const provider = useMemo(() => new HttpErpLabProvider(tenantId), [])
+  const [dataset, setDataset] = useState<SimulatorDataset>(() => createSeedDataset(tenantId))
   const [page, setPage] = useState<Page>('overview')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [poOpen, setPoOpen] = useState(false)
+  const [authOpen, setAuthOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const refresh = () => setDataset(provider.getDataset())
+  const refresh = async () => {
+    try { setDataset(await provider.getDataset()) }
+    catch (error) { notify('error', `数据库未就绪：${(error as Error).message}`) }
+  }
   const notify = (type: 'success' | 'error', text: string) => {
     setToast({ type, text })
     window.setTimeout(() => setToast(null), 3400)
   }
 
-  const activateScenario = (code: ScenarioCode, latencyMs?: number, failureRate?: number) => {
-    provider.setScenario({ code, enabled: true, latencyMs: latencyMs ?? (code === 'SLOW_ERP' ? 1800 : 0), failureRate: failureRate ?? 1 })
-    refresh()
+  useEffect(() => {
+    let active = true
+    provider.getDataset().then(remote => { if (active) setDataset(remote) }).catch(error => { if (active) setToast({ type: 'error', text: `数据库未就绪：${error.message}` }) })
+    return () => { active = false }
+  }, [provider])
+
+  const activateScenario = async (code: ScenarioCode, latencyMs?: number, failureRate?: number) => {
+    await provider.setScenario({ code, enabled: true, latencyMs: latencyMs ?? (code === 'SLOW_ERP' ? 1800 : 0), failureRate: failureRate ?? 1 })
+    await refresh()
     notify('success', `已切换到 ${SCENARIO_META.find(item => item.code === code)?.label}`)
   }
 
-  const reset = () => {
-    provider.resetDataset()
-    refresh()
+  const reset = async () => {
+    await provider.resetDataset()
+    await refresh()
     notify('success', 'Golden Dataset 已恢复')
   }
 
@@ -58,7 +67,7 @@ function App() {
     <div className="app-shell">
       <Sidebar page={page} setPage={setPage} />
       <main className="main-area">
-        <Topbar dataset={dataset} onScenario={() => setPage('scenarios')} />
+        <Topbar dataset={dataset} onScenario={() => setPage('scenarios')} onSettings={() => setAuthOpen(true)} authenticated={provider.hasAccessToken()} />
         <div className="page-wrap">
           {page === 'overview' && <Overview dataset={dataset} provider={provider} refresh={refresh} notify={notify} setPage={setPage} reset={reset} exportDataset={exportDataset} setPoOpen={setPoOpen} />}
           {page === 'data' && <DataExplorer dataset={dataset} />}
@@ -69,6 +78,7 @@ function App() {
         </div>
       </main>
       {poOpen && <CreatePoModal dataset={dataset} provider={provider} close={() => setPoOpen(false)} refresh={refresh} notify={notify} busy={busy} setBusy={setBusy} />}
+      {authOpen && <AccessModal provider={provider} close={() => setAuthOpen(false)} notify={notify} />}
       {toast && <div className={`toast ${toast.type}`}><span>{toast.type === 'success' ? <Check size={16} /> : <AlertTriangle size={16} />}</span>{toast.text}</div>}
     </div>
   )
@@ -88,19 +98,19 @@ function Sidebar({ page, setPage }: { page: Page; setPage: (page: Page) => void 
     <div className="workspace-label">ERP 集成环境</div>
     <nav>{items.map(item => <button key={item.id} className={page === item.id ? 'active' : ''} onClick={() => setPage(item.id)}><item.icon size={18} /><span>{item.label}</span>{item.badge && <em>{item.badge}</em>}</button>)}</nav>
     <div className="sidebar-spacer" />
-    <div className="lab-status"><div className="pulse-dot" /><div><strong>Simulator 在线</strong><small>浏览器持久化 · v1.0</small></div></div>
+    <div className="lab-status"><div className="pulse-dot" /><div><strong>Simulator 在线</strong><small>PostgreSQL 共享数据 · v2.0</small></div></div>
     <div className="user-card"><div className="avatar">GY</div><div><strong>Gongyu</strong><small>Management</small></div><ChevronDown size={15} /></div>
   </aside>
 }
 
-function Topbar({ dataset, onScenario }: { dataset: SimulatorDataset; onScenario: () => void }) {
+function Topbar({ dataset, onScenario, onSettings, authenticated }: { dataset: SimulatorDataset; onScenario: () => void; onSettings: () => void; authenticated: boolean }) {
   const meta = SCENARIO_META.find(item => item.code === dataset.scenario.code)
   return <header className="topbar">
     <div className="breadcrumbs"><span>Settings</span><i>/</i><strong>Integrations</strong><i>/</i><b>ERP Sandbox</b></div>
     <div className="top-actions">
       <button className={`scenario-pill ${dataset.scenario.code !== 'NORMAL' ? 'danger' : ''}`} onClick={onScenario}><span />{meta?.label}<ChevronDown size={14} /></button>
       <div className="tenant"><span>租户</span><strong>{dataset.tenantId}</strong></div>
-      <button className="icon-btn"><Settings2 size={18} /></button>
+      <button className={`icon-btn ${authenticated ? 'authenticated' : ''}`} onClick={onSettings} title="管理访问凭证"><Settings2 size={18} /></button>
     </div>
   </header>
 }
@@ -115,7 +125,7 @@ function Overview({ dataset, provider, refresh, notify, setPage, reset, exportDa
   ]
   const check = async () => {
     setChecking(true)
-    try { const r = await provider.testConnection(); notify('success', r.message); refresh() } catch (e) { notify('error', (e as Error).message); refresh() }
+    try { const r = await provider.testConnection(); notify('success', r.message); await refresh() } catch (e) { notify('error', (e as Error).message); await refresh() }
     setChecking(false)
   }
   const success = dataset.requestLogs.length ? Math.round(dataset.requestLogs.filter((l: any) => l.result === 'SUCCESS').length / dataset.requestLogs.length * 100) : 100
@@ -185,11 +195,11 @@ function SnapshotImporter({ dataset, provider, refresh, notify }: any) {
     const parsed = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[workbook.SheetNames[0]], { defval: '' })
     setFileName(file.name); setRows(parsed); setMappings(suggestMappings(parsed.length ? Object.keys(parsed[0]) : [], type)); setReport(null)
   }
-  const confirm = () => {
+  const confirm = async () => {
     const result = importRows(dataset, type, rows, mappings, replace)
     setReport(result.report)
     if (!result.report.errors.length && !result.report.brokenReferences.length) {
-      provider.replaceDataset(result.dataset); refresh(); notify('success', `成功导入 ${result.report.rowsImported} 条记录`)
+      await provider.replaceDataset(result.dataset); await refresh(); notify('success', `成功导入 ${result.report.rowsImported} 条记录`)
     } else notify('error', '导入被阻止，请处理校验错误或断开的引用')
   }
   return <><PageHeader eyebrow="SNAPSHOT IMPORTER" title="导入脱敏 ERP 快照" text="先选择数据集、确认字段映射和完整性，再写入 Simulator。原始文件不会上传到服务器。" />
@@ -237,7 +247,7 @@ function TestConsole({ provider, dataset, activate, refresh }: any) {
       const replay = await createTestPo(provider, key); if (!replay.idempotentReplay) throw new Error('重试没有命中幂等记录')
       activate('NORMAL', 0, 0)
     } },
-    { name: 'ERP-E2E-008 · ETA 更新', run: () => provider.updateEta({ poExternalId: provider.getDataset().purchaseOrders[0].externalId, lineNo: 1, eta: '2026-09-20', confirmedQty: '1000' }) },
+    { name: 'ERP-E2E-008 · ETA 更新', run: async () => { const current = await provider.getDataset(); return provider.updateEta({ poExternalId: current.purchaseOrders[0].externalId, lineNo: 1, eta: '2026-09-20', confirmedQty: '1000' }) } },
   ]
   const runAll = async () => {
     setRunning(true); activate('NORMAL', 0, 0); setResults(tests.map(test => ({ name: test.name, status: 'running', detail: '等待执行' })))
@@ -246,7 +256,7 @@ function TestConsole({ provider, dataset, activate, refresh }: any) {
       try { await tests[i].run(); setResults(current => current.map((r, j) => j === i ? { ...r, status: 'passed', detail: '通过', ms: Math.round(performance.now() - started) } : r)) }
       catch (e) { setResults(current => current.map((r, j) => j === i ? { ...r, status: 'failed', detail: (e as Error).message, ms: Math.round(performance.now() - started) } : r)) }
     }
-    activate('NORMAL', 120, 0); refresh(); setRunning(false)
+    await activate('NORMAL', 120, 0); await refresh(); setRunning(false)
   }
   const passed = results.filter(r => r.status === 'passed').length
   return <><PageHeader eyebrow="AUTOMATED TEST SUITE" title="ERP 测试控制台" text="运行同一套 Provider Contract 与关键 E2E 链路，真实 Kingdee Provider 后续也必须通过。" action={<button className="btn primary" onClick={runAll} disabled={running}>{running ? <LoaderCircle className="spin" size={16} /> : <Play size={16} />}{running ? '正在运行…' : '运行全部测试'}</button>} />
@@ -256,7 +266,7 @@ function TestConsole({ provider, dataset, activate, refresh }: any) {
     </div></>
 }
 
-async function createTestPo(provider: KingdeeSimulatorProvider, key: string) {
+async function createTestPo(provider: HttpErpLabProvider, key: string) {
   return provider.createPurchaseOrder({ supplierCode: 'SUP-DIGIKEY', currency: 'USD', orderDate: new Date().toISOString().slice(0, 10), requestedDate: '2026-09-25', lines: [{ lineNo: 1, materialCode: 'EZ-ADS131M04', qty: '25', unitPrice: '13.85' }] }, key)
 }
 
@@ -269,11 +279,21 @@ function CreatePoModal({ dataset, provider, close, refresh, notify, busy, setBus
   const [key, setKey] = useState(`PR-DEMO-${formId}`)
   const submit = async () => {
     setBusy(true)
-    try { const r = await provider.createPurchaseOrder({ supplierCode: supplier, currency: dataset.suppliers.find((s: any) => s.supplierCode === supplier)?.currency || 'CNY', orderDate: new Date().toISOString().slice(0, 10), requestedDate: '2026-09-30', lines: [{ lineNo: 1, materialCode: material, qty, unitPrice: price }] }, key); notify('success', r.idempotentReplay ? `幂等重放：${r.documentNumber}` : `PO 已创建：${r.documentNumber}`); refresh(); close() }
-    catch (e) { notify('error', `${(e as any).code || 'ERROR'} · ${(e as Error).message}`); refresh() }
+    try { const r = await provider.createPurchaseOrder({ supplierCode: supplier, currency: dataset.suppliers.find((s: any) => s.supplierCode === supplier)?.currency || 'CNY', orderDate: new Date().toISOString().slice(0, 10), requestedDate: '2026-09-30', lines: [{ lineNo: 1, materialCode: material, qty, unitPrice: price }] }, key); notify('success', r.idempotentReplay ? `幂等重放：${r.documentNumber}` : `PO 已创建：${r.documentNumber}`); await refresh(); close() }
+    catch (e) { notify('error', `${(e as any).code || 'ERROR'} · ${(e as Error).message}`); await refresh() }
     setBusy(false)
   }
   return <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && close()}><div className="modal"><div className="modal-head"><div><span><ShoppingCart size={20} /></span><div><h2>模拟创建采购单</h2><p>所有写操作都会生成 AuditLog</p></div></div><button onClick={close}><X size={19} /></button></div><div className="modal-body"><label>供应商<select value={supplier} onChange={e => setSupplier(e.target.value)}>{dataset.suppliers.map((s: any) => <option value={s.supplierCode} key={s.supplierCode}>{s.name} · {s.supplierCode}</option>)}</select></label><label>物料<select value={material} onChange={e => setMaterial(e.target.value)}>{dataset.materials.map((m: any) => <option value={m.materialCode} key={m.materialCode}>{m.materialCode} · {m.mpn}</option>)}</select></label><div className="form-row"><label>数量<input value={qty} onChange={e => setQty(e.target.value)} /></label><label>单价<input value={price} onChange={e => setPrice(e.target.value)} /></label></div><label>Idempotency-Key<input value={key} onChange={e => setKey(e.target.value)} /><small>使用相同 Key 重试时，Simulator 返回首次创建的 PO。</small></label><div className="warning-box"><ShieldCheck size={17} /><span>场景 <strong>{dataset.scenario.code}</strong> 将应用于本次请求</span></div></div><div className="modal-actions"><button className="btn secondary" onClick={close}>取消</button><button className="btn primary" onClick={submit} disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <ShoppingCart size={16} />}创建 PO</button></div></div></div>
+}
+
+function AccessModal({ provider, close, notify }: { provider: HttpErpLabProvider; close: () => void; notify: (type: 'success' | 'error', text: string) => void }) {
+  const [token, setToken] = useState('')
+  const save = () => {
+    if (!token.trim()) { notify('error', '请输入 ERP Lab 管理凭证'); return }
+    provider.setAccessToken(token); notify('success', '管理凭证已保存到当前浏览器会话'); close()
+  }
+  const clear = () => { provider.clearAccessToken(); notify('success', '管理凭证已清除'); close() }
+  return <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && close()}><div className="modal access-modal"><div className="modal-head"><div><span><ShieldCheck size={20} /></span><div><h2>ERP Lab 管理访问</h2><p>凭证仅保存在当前浏览器 sessionStorage</p></div></div><button onClick={close}><X size={19} /></button></div><div className="modal-body"><label>管理凭证<input type="password" autoComplete="current-password" value={token} onChange={e => setToken(e.target.value)} placeholder="ERP_LAB_ACCESS_TOKEN" /><small>用于场景切换、数据导入、重置、PO 和 ETA 写入；不会写入 Git 或数据库日志。</small></label><div className="warning-box"><ShieldCheck size={17} /><span>公开访问者可以查看数据，但没有凭证不能修改共享数据库。</span></div></div><div className="modal-actions"><button className="btn secondary" onClick={clear}>清除凭证</button><button className="btn primary" onClick={save}><ShieldCheck size={16} />保存到本次会话</button></div></div></div>
 }
 
 function PageHeader({ eyebrow, title, text, action }: { eyebrow: string; title: string; text: string; action?: React.ReactNode }) { return <section className="page-heading compact"><div><div className="eyebrow"><span>{eyebrow}</span></div><h1>{title}</h1><p>{text}</p></div>{action}</section> }

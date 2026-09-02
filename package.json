@@ -1,11 +1,17 @@
 {
   "name": "ezplm-erp-lab",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "vercel dev",
+    "dev:web": "vite",
+    "build": "prisma generate && tsc -b && tsc --noEmit -p tsconfig.server.json && vite build",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
     "lint": "eslint .",
     "test": "vitest run",
     "test:erp": "vitest run src/lib/providers/erp",
@@ -13,6 +19,7 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
+    "@prisma/client": "^6.16.1",
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
@@ -20,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/js": "latest",
+    "@vercel/node": "latest",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
@@ -27,9 +35,11 @@
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
     "globals": "latest",
+    "prisma": "^6.16.1",
     "typescript": "~5.9.2",
     "typescript-eslint": "latest",
     "vite": "latest",
-    "vitest": "latest"
+    "vitest": "latest",
+    "vercel": "latest"
   }
 }

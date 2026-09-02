@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ErpSimTenant {
+  id               String                   @id
+  datasetName      String
+  seededAt         DateTime
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  materials        ErpSimMaterial[]
+  inventory        ErpSimInventory[]
+  excess           ErpSimExcess[]
+  suppliers        ErpSimSupplier[]
+  customers        ErpSimCustomer[]
+  exchangeRates    ErpSimExchangeRate[]
+  purchaseOrders   ErpSimPurchaseOrder[]
+  scenario         ErpSimScenario?
+  requestLogs      ErpSimRequestLog[]
+  auditLogs        ErpSimAuditLog[]
+  mappingProfiles  ErpSimMappingProfile[]
+}
+
+model ErpSimMaterial {
+  id            String       @id @default(cuid())
+  tenantId      String
+  tenant        ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId    String
+  materialCode  String
+  internalPn    String?
+  manufacturer  String?
+  mpn           String?
+  description   String?
+  specification String?
+  unit          String?
+  lifecycle     String?
+  status        String?
+  sourceUpdatedAt DateTime?
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, materialCode])
+}
+
+model ErpSimInventory {
+  id            String       @id @default(cuid())
+  tenantId      String
+  tenant        ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId    String
+  materialCode  String
+  warehouseCode String?
+  warehouseName String?
+  customerCode  String?
+  onHandQty     Decimal      @db.Decimal(30, 10)
+  availableQty  Decimal?     @db.Decimal(30, 10)
+  reservedQty   Decimal?     @db.Decimal(30, 10)
+  lotNo         String?
+  sourceUpdatedAt DateTime?
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, materialCode])
+}
+
+model ErpSimExcess {
+  id                String       @id @default(cuid())
+  tenantId          String
+  tenant            ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId        String
+  materialCode      String
+  customerCode      String?
+  warehouseCode     String?
+  bookQty           Decimal      @db.Decimal(30, 10)
+  availableQty      Decimal      @db.Decimal(30, 10)
+  earliestInboundAt DateTime?
+  sourceDocumentId  String?
+  sourceUpdatedAt   DateTime?
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, materialCode])
+}
+
+model ErpSimSupplier {
+  id            String       @id @default(cuid())
+  tenantId      String
+  tenant        ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId    String
+  supplierCode  String
+  name          String
+  status        String?
+  currency      String?
+  sourceUpdatedAt DateTime?
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, supplierCode])
+}
+
+model ErpSimCustomer {
+  id            String       @id @default(cuid())
+  tenantId      String
+  tenant        ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId    String
+  customerCode  String
+  name          String
+  status        String?
+  sourceUpdatedAt DateTime?
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, customerCode])
+}
+
+model ErpSimExchangeRate {
+  id            String       @id @default(cuid())
+  tenantId      String
+  tenant        ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  baseCurrency  String
+  quoteCurrency String
+  rate          Decimal      @db.Decimal(30, 12)
+  rateType      String?
+  effectiveDate DateTime
+  source        String
+
+  @@unique([tenantId, baseCurrency, quoteCurrency, effectiveDate])
+}
+
+model ErpSimPurchaseOrder {
+  id             String                    @id @default(cuid())
+  tenantId       String
+  tenant         ErpSimTenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId     String?
+  poNumber       String?
+  supplierCode   String
+  currency       String
+  orderDate      DateTime
+  requestedDate  DateTime?
+  status         String?
+  idempotencyKey String?
+  lines          ErpSimPurchaseOrderLine[]
+
+  @@unique([tenantId, externalId])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, poNumber])
+}
+
+model ErpSimPurchaseOrderLine {
+  id              String              @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   ErpSimPurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  lineNo          Int
+  materialCode    String
+  qty             Decimal             @db.Decimal(30, 10)
+  unitPrice       Decimal             @db.Decimal(30, 10)
+  requestedDate   DateTime?
+  confirmedQty    Decimal?            @db.Decimal(30, 10)
+  eta             DateTime?
+  shipDate        DateTime?
+
+  @@unique([purchaseOrderId, lineNo])
+}
+
+model ErpSimScenario {
+  id              String       @id @default(cuid())
+  tenantId        String       @unique
+  tenant          ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code            String
+  enabled         Boolean
+  latencyMs       Int
+  failureRate     Float
+  targetOperation String?
+}
+
+model ErpSimRequestLog {
+  id              String       @id
+  tenantId        String
+  tenant          ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  timestamp       DateTime
+  operation       String
+  requestId       String
+  attempt         Int
+  requestPayload  Json?
+  responsePayload Json?
+  latency         Int
+  scenario        String
+  result          String
+  errorCode       String?
+  errorMessage    String?
+
+  @@index([tenantId, timestamp(sort: Desc)])
+}
+
+model ErpSimAuditLog {
+  id         String       @id
+  tenantId   String
+  tenant     ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  timestamp  DateTime
+  actor      String
+  action     String
+  entityType String
+  entityId   String?
+  result     String
+  details    String?
+
+  @@index([tenantId, timestamp(sort: Desc)])
+}
+
+model ErpSimMappingProfile {
+  id          String       @id
+  tenantId    String
+  tenant      ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  datasetType String
+  mappings    Json
+  createdAt   DateTime
+
+  @@index([tenantId, datasetType])
+}

@@ -27,29 +27,29 @@ export class KingdeeSimulatorProvider implements ErpProvider {
 
   getDataset() { return this.repository.load() }
   resetDataset() { return this.repository.reset() }
-  replaceDataset(dataset: SimulatorDataset) { this.repository.save(dataset) }
+  replaceDataset(dataset: SimulatorDataset) { return this.repository.save(dataset) }
 
-  setScenario(scenario: ErpSimScenario) {
-    const dataset = this.repository.load()
+  async setScenario(scenario: ErpSimScenario) {
+    const dataset = await this.repository.load()
     dataset.scenario = clone(scenario)
-    this.repository.save(dataset)
+    await this.repository.save(dataset)
   }
 
   private async execute<T>(operation: string, payload: unknown, action: (dataset: SimulatorDataset) => T | Promise<T>): Promise<T> {
     const started = Date.now()
     const requestId = uid()
-    const dataset = this.repository.load()
+    const dataset = await this.repository.load()
     try {
       await beforeOperation(dataset.scenario, operation)
       const response = await action(dataset)
       this.addLog(dataset, { operation, requestId, payload, response, started, result: 'SUCCESS' })
-      this.repository.save(dataset)
+      await this.repository.save(dataset)
       return clone(response)
     } catch (error) {
       const normalized = error instanceof ErpProviderError ? error : new ErpProviderError('UNEXPECTED_ERROR', error instanceof Error ? error.message : 'Unknown error')
-      const latest = this.repository.load()
+      const latest = await this.repository.load()
       this.addLog(latest, { operation, requestId, payload, started, result: 'FAILED', error: normalized })
-      this.repository.save(latest)
+      await this.repository.save(latest)
       throw normalized
     }
   }
@@ -113,7 +113,7 @@ export class KingdeeSimulatorProvider implements ErpProvider {
 
   async createPurchaseOrder(input: ErpPurchaseOrder, idempotencyKey: string): Promise<ErpWriteResult> {
     if (!idempotencyKey.trim()) throw new ErpProviderError('IDEMPOTENCY_KEY_REQUIRED', '创建 PO 必须提供 Idempotency-Key', false, 400)
-    const existingDataset = this.repository.load()
+    const existingDataset = await this.repository.load()
     const existing = existingDataset.purchaseOrders.find(po => po.idempotencyKey === idempotencyKey)
     if (existing) {
       return this.execute('createPurchaseOrder', { input, idempotencyKey, replay: true }, dataset => {
@@ -122,7 +122,7 @@ export class KingdeeSimulatorProvider implements ErpProvider {
       })
     }
 
-    return this.execute('createPurchaseOrder', { input, idempotencyKey }, dataset => {
+    return this.execute('createPurchaseOrder', { input, idempotencyKey }, async dataset => {
       const supplier = dataset.suppliers.find(item => item.supplierCode === input.supplierCode)
       if (!supplier) throw new ErpProviderError('SUPPLIER_NOT_FOUND', `供应商 ${input.supplierCode} 不存在`, false, 422)
       const missingMaterial = input.lines.find(line => !dataset.materials.some(item => item.materialCode === line.materialCode))
@@ -138,10 +138,10 @@ export class KingdeeSimulatorProvider implements ErpProvider {
       this.addAudit(dataset, { actor: 'erp-lab-user', action: 'CREATE_PO', entityType: 'PURCHASE_ORDER', entityId: po.externalId, result: 'SUCCESS', details: `Idempotency-Key: ${idempotencyKey}` })
 
       if (dataset.scenario.code === 'NETWORK_DROP_AFTER_COMMIT') {
-        this.repository.save(dataset)
-        const committed = this.repository.load()
+        await this.repository.save(dataset)
+        const committed = await this.repository.load()
         this.addLog(committed, { operation: 'createPurchaseOrder', requestId: uid(), payload: { input, idempotencyKey }, response: { externalId: po.externalId }, started: Date.now(), result: 'COMMITTED_NO_RESPONSE' })
-        this.repository.save(committed)
+        await this.repository.save(committed)
         throw new ErpProviderError('NETWORK_DROP_AFTER_COMMIT', 'PO 已在 ERP 提交，但网络在返回响应前断开；请使用相同 Idempotency-Key 重试', true, 503)
       }
       return { success: true, externalId: po.externalId, documentNumber: po.poNumber, idempotentReplay: false, message: '采购单已创建' }
