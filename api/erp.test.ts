@@ -9,7 +9,7 @@ describe('ERP API bootstrap', () => {
     else process.env.DATABASE_URL = originalDatabaseUrl
   })
 
-  it('returns a JSON configuration error before loading Prisma', async () => {
+  it('returns a JSON configuration error without querying Prisma', async () => {
     delete process.env.DATABASE_URL
     let status = 0
     let body: unknown
