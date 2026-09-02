@@ -3,14 +3,14 @@ import { ErpProviderError, type DatasetType, type ErpEtaUpdate, type ErpPurchase
 
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error?: { code?: string; message?: string; retryable?: boolean } }
 
-async function fetchApi(input: RequestInfo | URL, init: RequestInit = {}) {
+async function fetchApi(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 15_000) {
   const controller = new AbortController()
-  const timer = window.setTimeout(() => controller.abort(), 15_000)
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs)
   try {
     return await fetch(input, { ...init, signal: controller.signal })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new ErpProviderError('ERP_API_TIMEOUT', 'ERP API 在 15 秒内没有响应，请检查 Neon 连接串及 Vercel Function 日志。', true, 504)
+      throw new ErpProviderError('ERP_API_TIMEOUT', `ERP API 在 ${Math.round(timeoutMs / 1000)} 秒内没有响应，请检查 Neon 连接串及 Vercel Function 日志。`, true, 504)
     }
     throw error
   } finally {
@@ -61,6 +61,21 @@ export class HttpErpLabProvider implements ErpProvider {
     const text = await response.text()
     try { return JSON.parse(text) }
     catch { throw new ErpProviderError('HEALTH_CHECK_ERROR', `健康检查返回异常（HTTP ${response.status}）`, true, response.status) }
+  }
+  async importCustomerSnapshot(type: Exclude<DatasetType, 'FX'>, file: File): Promise<{ type: string; rowsRead: number; recordsImported: number; inferredMaterials: number; inferredSuppliers: number; warnings: string[] }> {
+    const token = sessionStorage.getItem('ezplm:erp-lab:access-token')
+    if (!token) throw new ErpProviderError('ERP_LAB_UNAUTHORIZED', '请先在右上角设置 ERP Lab 管理凭证', false, 401)
+    const response = await fetchApi(`/api/snapshot?tenantId=${encodeURIComponent(this.tenantId)}&type=${encodeURIComponent(type)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', Authorization: `Bearer ${token}` },
+      body: file,
+    }, 60_000)
+    const result = await readApiResponse<{ type: string; rowsRead: number; recordsImported: number; inferredMaterials: number; inferredSuppliers: number; warnings: string[] }>(response)
+    if (!response.ok || !result.ok) {
+      const error = result.ok ? undefined : result.error
+      throw new ErpProviderError(error?.code || 'SNAPSHOT_IMPORT_ERROR', error?.message || '客户参考数据导入失败', false, response.status)
+    }
+    return result.data
   }
   resetDataset = () => this.rpc<SimulatorDataset>('resetDataset')
   replaceDataset = (dataset: SimulatorDataset) => this.rpc<SimulatorDataset>('replaceDataset', { dataset })
