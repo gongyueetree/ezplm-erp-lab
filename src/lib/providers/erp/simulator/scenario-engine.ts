@@ -15,6 +15,7 @@ export const SCENARIO_META = [
   { code: 'FX_MISSING', label: '汇率缺失', description: '汇率读取返回空集', tone: 'amber' },
   { code: 'PO_ALREADY_EXISTS', label: 'PO 已存在', description: '模拟 ERP 返回重复业务单据', tone: 'red' },
   { code: 'ERP_500', label: 'ERP 500', description: '模拟未知服务端错误', tone: 'red' },
+  { code: 'WORK_ORDER_SOURCE_UNAVAILABLE', label: '工单源不可用', description: '仅 pullWorkOrders 失败，其它数据源正常——验证消费方的部分降级', tone: 'amber' },
 ] as const
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -39,6 +40,10 @@ export async function beforeOperation(scenario: ErpSimScenario, operation: strin
       return
     case 'SUPPLIER_NOT_FOUND':
       if (operation === 'createPurchaseOrder') throw new ErpProviderError('SUPPLIER_NOT_FOUND', '供应商未在 ERP 中找到', false, 422)
+      return
+    case 'WORK_ORDER_SOURCE_UNAVAILABLE':
+      // 只打掉工单源，其它数据源照常——消费方应表现为「部分数据源失败」的降级，而不是整体黑屏
+      if (operation === 'pullWorkOrders') throw new ErpProviderError('WORK_ORDER_SOURCE_UNAVAILABLE', '工单数据源暂不可用（车间系统离线），其它数据源正常', true, 503)
       return
     default: return
   }

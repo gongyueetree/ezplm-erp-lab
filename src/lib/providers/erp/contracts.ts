@@ -7,7 +7,9 @@ import type {
   ErpInventory,
   ErpMaterial,
   ErpPurchaseOrder,
+  ErpSalesOrder,
   ErpSupplier,
+  ErpWorkOrder,
   ErpWriteResult,
   PullOptions,
 } from './types.js'
@@ -21,6 +23,9 @@ export interface ErpProvider {
   pullCustomers(input?: PullOptions): Promise<ErpCustomer[]>
   pullExchangeRates(input?: PullOptions): Promise<ErpExchangeRate[]>
   pullOpenPurchaseOrders(input?: PullOptions): Promise<ErpPurchaseOrder[]>
+  // LAB-1: 工单与销售订单（ECN 影响分析、缺料/齐料闭环）
+  pullWorkOrders(input?: PullOptions): Promise<ErpWorkOrder[]>
+  pullSalesOrders(input?: PullOptions): Promise<ErpSalesOrder[]>
   createPurchaseOrder(input: ErpPurchaseOrder, idempotencyKey: string): Promise<ErpWriteResult>
   updateEta(input: ErpEtaUpdate): Promise<ErpWriteResult>
 }

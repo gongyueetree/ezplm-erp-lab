@@ -196,9 +196,13 @@ const datasetTabs: { id: DatasetType; label: string; field: keyof SimulatorDatas
   { id: 'EXCESS', label: 'Excess', field: 'excess' }, { id: 'SUPPLIER', label: '供应商', field: 'suppliers' },
   { id: 'CUSTOMER', label: '客户', field: 'customers' }, { id: 'OPEN_PO', label: 'Open PO', field: 'purchaseOrders' },
   { id: 'FX', label: '汇率', field: 'exchangeRates' },
+  // LAB-1: 工单/销售订单（嵌套行结构，经快照导入或种子维护，不走通用编辑器）
+  { id: 'WORK_ORDER', label: '工单', field: 'workOrders' }, { id: 'SALES_ORDER', label: '销售订单', field: 'salesOrders' },
 ]
 
-type MaintainableType = Exclude<DatasetType, 'OPEN_PO'>
+// 嵌套行结构的数据集：通用平面编辑器一保存就会丢行，禁用之
+const NESTED_TYPES = new Set<DatasetType>(['OPEN_PO', 'WORK_ORDER', 'SALES_ORDER'])
+type MaintainableType = Exclude<DatasetType, 'OPEN_PO' | 'WORK_ORDER' | 'SALES_ORDER'>
 
 function maintenanceKey(type: MaintainableType, row: Record<string, unknown>) {
   return type === 'FX' ? [row.baseCurrency, row.quoteCurrency, row.effectiveDate].join('|') : String(row.externalId || '')
@@ -211,9 +215,10 @@ function DataExplorer({ dataset, provider, refresh, notify, setPoOpen }: { datas
   const tab = datasetTabs.find(item => item.id === active)!
   const raw = dataset[tab.field] as unknown[]
   const rows = raw.filter(row => JSON.stringify(row).toLowerCase().includes(search.toLowerCase())) as Record<string, any>[]
-  const columns = rows.length ? Object.keys(rows[0]).filter(key => !['lines', 'idempotencyKey'].includes(key)).slice(0, 8) : []
+  const columns = rows.length ? Object.keys(rows[0]).filter(key => !['lines', 'consumedLines', 'idempotencyKey'].includes(key)).slice(0, 8) : []
   const create = () => {
     if (active === 'OPEN_PO') { setPoOpen(true); return }
+    if (NESTED_TYPES.has(active)) return
     const now = new Date().toISOString().slice(0, 10)
     const defaults: Record<MaintainableType, Record<string, unknown>> = {
       MATERIAL: { externalId: `MAT-${Date.now()}`, materialCode: '', status: 'ACTIVE', unit: 'PCS' },
@@ -223,20 +228,20 @@ function DataExplorer({ dataset, provider, refresh, notify, setPoOpen }: { datas
       CUSTOMER: { externalId: `CUS-${Date.now()}`, customerCode: '', name: '', status: 'ACTIVE' },
       FX: { baseCurrency: 'CNY', quoteCurrency: '', rate: '1', rateType: 'SPOT', effectiveDate: now, source: 'MANUAL' },
     }
-    setEditing({ record: defaults[active] })
+    setEditing({ record: defaults[active as MaintainableType] })
   }
   const remove = async (row: Record<string, unknown>) => {
-    if (active === 'OPEN_PO' || !window.confirm('确认删除这条共享 PostgreSQL 记录？此操作会写入审计日志。')) return
-    try { await provider.deleteRecord(active, maintenanceKey(active, row)); await refresh(); notify('success', '记录已删除') }
+    if (NESTED_TYPES.has(active) || !window.confirm('确认删除这条共享 PostgreSQL 记录？此操作会写入审计日志。')) return
+    try { await provider.deleteRecord(active as MaintainableType, maintenanceKey(active as MaintainableType, row)); await refresh(); notify('success', '记录已删除') }
     catch (error) { notify('error', `${(error as any).code || 'ERROR'} · ${(error as Error).message}`) }
   }
-  return <><PageHeader eyebrow="DATASET EXPLORER" title="ERP 数据维护" text="在线新增、编辑和删除 Canonical ERP 数据；批量更新请使用快照导入。" action={<button className="btn primary" onClick={create}><Plus size={16} />{active === 'OPEN_PO' ? '创建 PO' : `新增${tab.label}`}</button>} />
+  return <><PageHeader eyebrow="DATASET EXPLORER" title="ERP 数据维护" text="在线新增、编辑和删除 Canonical ERP 数据；批量更新请使用快照导入。" action={NESTED_TYPES.has(active) && active !== 'OPEN_PO' ? undefined : <button className="btn primary" onClick={create}><Plus size={16} />{active === 'OPEN_PO' ? '创建 PO' : `新增${tab.label}`}</button>} />
     <div className="maintenance-note"><ShieldCheck size={16} /><span>所有修改均写入 PostgreSQL 并记录 Audit Log；写入操作需要管理凭证。</span><button onClick={() => setSearch('')}>清除筛选</button></div>
     <div className="panel data-panel"><div className="data-toolbar"><div className="tab-list">{datasetTabs.map(item => <button className={active === item.id ? 'active' : ''} onClick={() => { setActive(item.id); setSearch('') }} key={item.id}>{item.label}<em>{(dataset[item.field] as unknown[]).length}</em></button>)}</div><label className="search-box"><Search size={16} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索当前数据集…" /></label></div>
-      <div className="table-wrap"><table><thead><tr>{columns.map(column => <th key={column}>{prettyKey(column)}</th>)}<th>操作</th></tr></thead><tbody>{rows.map((row, index) => <tr key={maintenanceKey(active === 'OPEN_PO' ? 'MATERIAL' : active, row) || index}>{columns.map(column => <td key={column}>{column.includes('status') ? <span className="status-tag">{String(row[column] ?? '—')}</span> : String(row[column] ?? '—')}</td>)}<td><div className="row-actions">{active === 'OPEN_PO' ? <button onClick={() => setPoOpen(true)}><Pencil size={13} />通过 PO 流程维护</button> : <><button onClick={() => setEditing({ record: { ...row }, originalKey: maintenanceKey(active, row) })}><Pencil size={13} />编辑</button><button className="danger" onClick={() => remove(row)}><Trash2 size={13} />删除</button></>}</div></td></tr>)}</tbody></table>{rows.length === 0 && <EmptyState icon={Database} text="当前数据集没有记录" />}</div>
+      <div className="table-wrap"><table><thead><tr>{columns.map(column => <th key={column}>{prettyKey(column)}</th>)}<th>操作</th></tr></thead><tbody>{rows.map((row, index) => <tr key={maintenanceKey(NESTED_TYPES.has(active) ? 'MATERIAL' : (active as MaintainableType), row) || index}>{columns.map(column => <td key={column}>{column.includes('status') ? <span className="status-tag">{String(row[column] ?? '—')}</span> : String(row[column] ?? '—')}</td>)}<td><div className="row-actions">{active === 'OPEN_PO' ? <button onClick={() => setPoOpen(true)}><Pencil size={13} />通过 PO 流程维护</button> : NESTED_TYPES.has(active) ? <span className="status-tag">经快照导入/种子维护</span> : <><button onClick={() => setEditing({ record: { ...row }, originalKey: maintenanceKey(active as MaintainableType, row) })}><Pencil size={13} />编辑</button><button className="danger" onClick={() => remove(row)}><Trash2 size={13} />删除</button></>}</div></td></tr>)}</tbody></table>{rows.length === 0 && <EmptyState icon={Database} text="当前数据集没有记录" />}</div>
       <div className="table-footer"><span>显示 {rows.length} / {raw.length} 条记录</span><span>Tenant: <code>{dataset.tenantId}</code></span></div>
     </div>
-    {editing && active !== 'OPEN_PO' && <RecordEditorModal type={active} value={editing.record} originalKey={editing.originalKey} provider={provider} close={() => setEditing(null)} refresh={refresh} notify={notify} />}
+    {editing && !NESTED_TYPES.has(active) && <RecordEditorModal type={active as MaintainableType} value={editing.record} originalKey={editing.originalKey} provider={provider} close={() => setEditing(null)} refresh={refresh} notify={notify} />}
   </>
 }
 
