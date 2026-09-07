@@ -9,7 +9,7 @@ const makeProvider = () => new KingdeeSimulatorProvider(new MemorySimulatorRepos
 describe('LAB-1 · ErpProvider contract · WorkOrder / SalesOrder', () => {
   it('pullWorkOrders returns canonical work orders with decimal strings and consumed lines', async () => {
     const provider = makeProvider()
-    const workOrders = await provider.pullWorkOrders()
+    const workOrders = (await provider.pullWorkOrders()).items
     expect(workOrders.length).toBeGreaterThan(0)
     for (const wo of workOrders) {
       expect(typeof wo.qty).toBe('string')
@@ -21,7 +21,7 @@ describe('LAB-1 · ErpProvider contract · WorkOrder / SalesOrder', () => {
 
   it('pullSalesOrders returns canonical sales orders; shippedQty never exceeds qty in seed', async () => {
     const provider = makeProvider()
-    const salesOrders = await provider.pullSalesOrders()
+    const salesOrders = (await provider.pullSalesOrders()).items
     expect(salesOrders.length).toBeGreaterThan(0)
     for (const so of salesOrders) {
       expect(so.customerCode.length).toBeGreaterThan(0)
@@ -34,8 +34,8 @@ describe('LAB-1 · ErpProvider contract · WorkOrder / SalesOrder', () => {
 
   it('respects the limit option like other pull operations', async () => {
     const provider = makeProvider()
-    expect((await provider.pullWorkOrders({ limit: 1 }))).toHaveLength(1)
-    expect((await provider.pullSalesOrders({ limit: 1 }))).toHaveLength(1)
+    expect((await provider.pullWorkOrders({ limit: 1 })).items).toHaveLength(1)
+    expect((await provider.pullSalesOrders({ limit: 1 })).items).toHaveLength(1)
   })
 })
 
@@ -50,10 +50,10 @@ describe('LAB-1 · WORK_ORDER_SOURCE_UNAVAILABLE — 部分数据源失败', () 
     })
 
     // 其它数据源必须照常返回——消费方据此实现「部分降级」而不是整体黑屏
-    expect((await provider.pullMaterials()).length).toBeGreaterThan(0)
-    expect((await provider.pullInventory()).length).toBeGreaterThan(0)
-    expect((await provider.pullSalesOrders()).length).toBeGreaterThan(0)
-    expect((await provider.pullOpenPurchaseOrders()).length).toBeGreaterThan(0)
+    expect((await provider.pullMaterials()).items.length).toBeGreaterThan(0)
+    expect((await provider.pullInventory()).items.length).toBeGreaterThan(0)
+    expect((await provider.pullSalesOrders()).items.length).toBeGreaterThan(0)
+    expect((await provider.pullOpenPurchaseOrders()).items.length).toBeGreaterThan(0)
   })
 
   it('the failure is logged in request logs with its scenario', async () => {

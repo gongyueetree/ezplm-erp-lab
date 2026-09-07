@@ -22,6 +22,7 @@ model ErpSimTenant {
   customers        ErpSimCustomer[]
   exchangeRates    ErpSimExchangeRate[]
   purchaseOrders   ErpSimPurchaseOrder[]
+  receipts         ErpSimReceipt[]
   workOrders       ErpSimWorkOrder[]
   salesOrders      ErpSimSalesOrder[]
   scenario         ErpSimScenario?
@@ -188,10 +189,40 @@ model ErpSimPurchaseOrderLine {
   unitPrice       Decimal             @db.Decimal(30, 10)
   requestedDate   DateTime?
   confirmedQty    Decimal?            @db.Decimal(30, 10)
+  /// closed-loop: 累计收货量(receivePurchaseOrder 维护)
+  receivedQty     Decimal?            @db.Decimal(30, 10)
   eta             DateTime?
   shipDate        DateTime?
 
   @@unique([purchaseOrderId, lineNo])
+}
+
+// closed-loop: 收货单(PO → 收货 → 库存 → 状态推进 的最小闭环)
+model ErpSimReceipt {
+  id             String              @id @default(cuid())
+  tenantId       String
+  tenant         ErpSimTenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId     String
+  receiptNumber  String
+  poExternalId   String
+  poNumber       String?
+  receivedAt     DateTime
+  idempotencyKey String?
+  lines          ErpSimReceiptLine[]
+
+  @@unique([tenantId, externalId])
+  @@unique([tenantId, idempotencyKey])
+}
+
+model ErpSimReceiptLine {
+  id            String        @id @default(cuid())
+  receiptId     String
+  receipt       ErpSimReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  lineNo        Int
+  materialCode  String
+  qty           Decimal       @db.Decimal(30, 10)
+  lotNo         String?
+  warehouseCode String?
 }
 
 // LAB-1: 工单（供 ECN 影响分析与缺料/齐料闭环消费）。
@@ -275,6 +306,8 @@ model ErpSimRequestLog {
   timestamp       DateTime
   operation       String
   requestId       String
+  /// closed-loop: 主系统传入的关联 id(X-Correlation-Id)
+  correlationId   String?
   attempt         Int
   requestPayload  Json?
   responsePayload Json?

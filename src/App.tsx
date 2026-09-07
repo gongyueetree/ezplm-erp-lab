@@ -267,10 +267,12 @@ function SnapshotImporter({ dataset, provider, refresh, notify }: any) {
   const [mappings, setMappings] = useState<MappingProfile['mappings']>([])
   const [replace, setReplace] = useState(true)
   const [report, setReport] = useState<any>(null)
-  const [bulkFiles, setBulkFiles] = useState<{ type: Exclude<DatasetType, 'FX'>; file: File }[]>([])
+  const [bulkFiles, setBulkFiles] = useState<{ type: Exclude<DatasetType, 'WORK_ORDER' | 'SALES_ORDER'>; file: File }[]>([])
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkReports, setBulkReports] = useState<any[]>([])
-  const snapshotType = (name: string): Exclude<DatasetType, 'FX'> | null => {
+  // closed-loop P0-3:客户快照默认 STRICT_UAT(静默纠偏 = 错误);演示数据可切宽松
+  const [importMode, setImportMode] = useState<'STRICT_UAT' | 'DEMO_LENIENT'>('STRICT_UAT')
+  const snapshotType = (name: string): Exclude<DatasetType, 'WORK_ORDER' | 'SALES_ORDER'> | null => {
     const upper = name.toUpperCase()
     if (name.includes('物料')) return 'MATERIAL'
     if (name.includes('即时库存') || name.includes('库存')) return 'INVENTORY'
@@ -278,21 +280,22 @@ function SnapshotImporter({ dataset, provider, refresh, notify }: any) {
     if (name.includes('供应商')) return 'SUPPLIER'
     if (name.includes('客户')) return 'CUSTOMER'
     if (name.includes('采购订单')) return 'OPEN_PO'
+    if (name.includes('汇率')) return 'FX'
     return null
   }
   const selectBulkFiles = (selected: FileList) => {
-    const detected = [...selected].map(file => ({ file, type: snapshotType(file.name) })).filter((item): item is { file: File; type: Exclude<DatasetType, 'FX'> } => Boolean(item.type))
+    const detected = [...selected].map(file => ({ file, type: snapshotType(file.name) })).filter((item): item is { file: File; type: Exclude<DatasetType, 'WORK_ORDER' | 'SALES_ORDER'> } => Boolean(item.type))
     setBulkFiles(detected); setBulkReports([])
     if (detected.length !== selected.length) notify('error', `${selected.length - detected.length} 个文件无法从名称识别类型`)
   }
   const importBulkFiles = async () => {
-    const order: Exclude<DatasetType, 'FX'>[] = ['MATERIAL', 'SUPPLIER', 'CUSTOMER', 'INVENTORY', 'EXCESS', 'OPEN_PO']
+    const order: Exclude<DatasetType, 'WORK_ORDER' | 'SALES_ORDER'>[] = ['MATERIAL', 'SUPPLIER', 'CUSTOMER', 'FX', 'INVENTORY', 'EXCESS', 'OPEN_PO']
     if (!provider.hasAccessToken()) { notify('error', '请先在右上角设置管理凭证'); return }
     setBulkBusy(true); setBulkReports([])
     try {
       const reports = []
       for (const item of [...bulkFiles].sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type))) {
-        const result = await provider.importCustomerSnapshot(item.type, item.file)
+        const result = await provider.importCustomerSnapshot(item.type, item.file, importMode)
         reports.push({ fileName: item.file.name, ...result }); setBulkReports([...reports])
       }
       await refresh(); notify('success', `已导入 ${reports.length} 份客户参考快照`)
@@ -315,9 +318,21 @@ function SnapshotImporter({ dataset, provider, refresh, notify }: any) {
   return <><PageHeader eyebrow="SNAPSHOT IMPORTER" title="导入脱敏 ERP 快照" text="先选择数据集、确认字段映射和完整性，再写入 Simulator。" />
     <div className="panel customer-batch-import"><div className="batch-copy"><div className="step-head"><span><FileSpreadsheet size={17} /></span><div><h3>客户参考快照批量导入</h3><p>识别物料、库存、Excess、供应商、客户和采购订单，并按依赖顺序写入 PostgreSQL。</p></div></div><div className="batch-note"><ShieldCheck size={15} />文件只发送到当前 ERP Lab；不会进入公开 GitHub。缺失引用会建立 REFERENCE_ONLY 占位数据并写入审计日志。</div></div>
       <input ref={bulkInputRef} type="file" accept=".xlsx" multiple hidden onChange={event => event.target.files && selectBulkFiles(event.target.files)} />
-      <div className="batch-actions"><button className="btn secondary" onClick={() => bulkInputRef.current?.click()} disabled={bulkBusy}><UploadCloud size={16} />选择多份 Excel</button><button className="btn primary" onClick={importBulkFiles} disabled={bulkBusy || bulkFiles.length === 0}>{bulkBusy ? <LoaderCircle className="spin" size={16} /> : <ClipboardCheck size={16} />}导入 {bulkFiles.length || ''} 份文件</button></div>
-      {(bulkFiles.length > 0 || bulkReports.length > 0) && <div className="batch-file-list">{bulkFiles.map(item => { const done = bulkReports.find(report => report.fileName === item.file.name); return <div key={item.file.name}><span className={done ? 'done' : ''}>{done ? <Check size={14} /> : <FileSpreadsheet size={14} />}</span><strong>{item.type}</strong><p>{item.file.name}</p><em>{done ? `${done.recordsImported.toLocaleString()} 条` : `${(item.file.size / 1024).toFixed(0)} KB`}</em></div> })}</div>}
-      {bulkReports.some(item => item.warnings.length) && <div className="batch-warnings">{bulkReports.flatMap(item => item.warnings.map((warning: string) => <span key={`${item.type}-${warning}`}><AlertTriangle size={13} />{item.type}: {warning}</span>))}</div>}
+      <div className="batch-actions">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <select value={importMode} onChange={e => setImportMode(e.target.value as 'STRICT_UAT' | 'DEMO_LENIENT')} aria-label="导入模式">
+            <option value="STRICT_UAT">STRICT_UAT(客户快照默认:任何纠偏都报错,整批拒绝)</option>
+            <option value="DEMO_LENIENT">DEMO_LENIENT(演示:0/今天兜底并计警告)</option>
+          </select>
+        </label>
+        <button className="btn secondary" onClick={() => bulkInputRef.current?.click()} disabled={bulkBusy}><UploadCloud size={16} />选择多份 Excel</button><button className="btn primary" onClick={importBulkFiles} disabled={bulkBusy || bulkFiles.length === 0}>{bulkBusy ? <LoaderCircle className="spin" size={16} /> : <ClipboardCheck size={16} />}导入 {bulkFiles.length || ''} 份文件</button></div>
+      {(bulkFiles.length > 0 || bulkReports.length > 0) && <div className="batch-file-list">{bulkFiles.map(item => { const done = bulkReports.find(report => report.fileName === item.file.name); return <div key={item.file.name}><span className={done ? 'done' : ''}>{done ? <Check size={14} /> : <FileSpreadsheet size={14} />}</span><strong>{item.type}</strong><p>{item.file.name}</p><em>{done ? (done.rowsRejected > 0 ? `拒绝 ${done.rowsRejected} 行` : `${done.rowsAccepted.toLocaleString()} 条`) : `${(item.file.size / 1024).toFixed(0)} KB`}</em></div> })}</div>}
+      {bulkReports.some(item => item.warnings.length || item.brokenReferences?.length || item.invalidDecimals?.length || item.invalidDates?.length) && <div className="batch-warnings">
+        {bulkReports.flatMap(item => item.warnings.map((warning: string) => <span key={`${item.type}-w-${warning}`}><AlertTriangle size={13} />{item.type}: {warning}</span>))}
+        {bulkReports.flatMap(item => (item.brokenReferences ?? []).slice(0, 20).map((b: { type: string; value: string; row: number }) => <span key={`${item.type}-b-${b.row}-${b.value}`}><AlertTriangle size={13} />{item.type} 第 {b.row} 行:断裂引用 {b.type}「{b.value}」</span>))}
+        {bulkReports.flatMap(item => (item.invalidDecimals ?? []).slice(0, 20).map((d: { row: number; field: string; value: string }) => <span key={`${item.type}-d-${d.row}-${d.field}`}><AlertTriangle size={13} />{item.type} 第 {d.row} 行:「{d.field}」非法数字「{d.value}」</span>))}
+        {bulkReports.flatMap(item => (item.invalidDates ?? []).slice(0, 20).map((d: { row: number; field: string; value: string }) => <span key={`${item.type}-t-${d.row}-${d.field}`}><AlertTriangle size={13} />{item.type} 第 {d.row} 行:「{d.field}」非法日期「{d.value}」</span>))}
+      </div>}
     </div>
     <div className="import-layout"><div className="panel import-main"><div className="step-head"><span>1</span><div><h3>选择数据集与文件</h3><p>支持 .xlsx、.xls、.csv 和 .json</p></div></div>
       <div className="dataset-select">{datasetTabs.map(item => <button key={item.id} className={type === item.id ? 'active' : ''} onClick={() => { setType(item.id); setRows([]); setFileName('') }}>{item.label}</button>)}</div>

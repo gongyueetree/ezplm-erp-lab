@@ -8,13 +8,13 @@ describe('ErpProvider contract · Kingdee Simulator', () => {
   it('returns canonical master data and decimal strings', async () => {
     const provider = makeProvider()
     expect((await provider.testConnection()).connected).toBe(true)
-    expect((await provider.pullMaterials()).length).toBeGreaterThan(0)
-    const inventory = await provider.pullInventory()
+    expect((await provider.pullMaterials()).items.length).toBeGreaterThan(0)
+    const inventory = (await provider.pullInventory()).items
     expect(inventory.length).toBeGreaterThan(0)
     expect(typeof inventory[0].onHandQty).toBe('string')
-    expect((await provider.pullExcess()).length).toBeGreaterThan(0)
-    expect((await provider.pullExchangeRates()).length).toBeGreaterThan(0)
-    expect((await provider.pullOpenPurchaseOrders()).length).toBeGreaterThan(0)
+    expect((await provider.pullExcess()).items.length).toBeGreaterThan(0)
+    expect((await provider.pullExchangeRates()).items.length).toBeGreaterThan(0)
+    expect((await provider.pullOpenPurchaseOrders()).items.length).toBeGreaterThan(0)
   })
 
   it('requires an idempotency key for PO writes', async () => {

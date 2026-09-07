@@ -5,7 +5,7 @@ import { MemorySimulatorRepository } from '../../lib/providers/erp/simulator/rep
 describe('ERP-E2E · procurement flow', () => {
   it('pulls supply signals, creates a PO, then updates ETA', async () => {
     const provider = new KingdeeSimulatorProvider(new MemorySimulatorRepository('e2e-tenant'))
-    const [inventory, excess, openPo, workOrders, salesOrders] = await Promise.all([provider.pullInventory(), provider.pullExcess(), provider.pullOpenPurchaseOrders(), provider.pullWorkOrders(), provider.pullSalesOrders()])
+    const [inventory, excess, openPo, workOrders, salesOrders] = (await Promise.all([provider.pullInventory(), provider.pullExcess(), provider.pullOpenPurchaseOrders(), provider.pullWorkOrders(), provider.pullSalesOrders()])).map(page => page.items)
     expect(inventory.length + excess.length + openPo.length).toBeGreaterThan(0)
     // LAB-1: 工单与销售订单一并进入采购闭环的取数面
     expect(workOrders.length).toBeGreaterThan(0)

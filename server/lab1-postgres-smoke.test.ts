@@ -12,7 +12,7 @@ describe.skipIf(!url)('LAB-1 · Postgres persistence smoke', () => {
     const ds = await repo.load()
     expect(ds.workOrders.length).toBeGreaterThan(0)
     expect(ds.salesOrders.length).toBeGreaterThan(0)
-    const wos = await provider.pullWorkOrders()
+    const wos = (await provider.pullWorkOrders()).items
     expect(wos[0].consumedLines.length).toBeGreaterThan(0)
     expect(typeof wos[0].qty).toBe('string')
     const again = await repo.load()
