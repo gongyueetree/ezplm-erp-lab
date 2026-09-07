@@ -22,6 +22,8 @@ model ErpSimTenant {
   customers        ErpSimCustomer[]
   exchangeRates    ErpSimExchangeRate[]
   purchaseOrders   ErpSimPurchaseOrder[]
+  workOrders       ErpSimWorkOrder[]
+  salesOrders      ErpSimSalesOrder[]
   scenario         ErpSimScenario?
   requestLogs      ErpSimRequestLog[]
   auditLogs        ErpSimAuditLog[]
@@ -190,6 +192,69 @@ model ErpSimPurchaseOrderLine {
   shipDate        DateTime?
 
   @@unique([purchaseOrderId, lineNo])
+}
+
+// LAB-1: 工单（供 ECN 影响分析与缺料/齐料闭环消费）。
+// consumedLines 用子表存（与 PO Line 同一纪律：DECIMAL、行级唯一）。
+model ErpSimWorkOrder {
+  id               String                @id @default(cuid())
+  tenantId         String
+  tenant           ErpSimTenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId       String
+  woNumber         String
+  customerCode     String?
+  productCode      String
+  bomRef           String?
+  qty              Decimal               @db.Decimal(30, 10)
+  /// PLANNED / IN_PROGRESS / COMPLETED / SHIPPED
+  status           String
+  currentOperation String?
+  plannedStart     DateTime?
+  plannedEnd       DateTime?
+  consumedLines    ErpSimWorkOrderLine[]
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, woNumber])
+  @@index([tenantId, status])
+}
+
+model ErpSimWorkOrderLine {
+  id           String          @id @default(cuid())
+  workOrderId  String
+  workOrder    ErpSimWorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  materialCode String
+  consumedQty  Decimal         @db.Decimal(30, 10)
+
+  @@unique([workOrderId, materialCode])
+}
+
+// LAB-1: 销售订单（客户需求侧，供缺料闭环与门户消费）。
+model ErpSimSalesOrder {
+  id           String                 @id @default(cuid())
+  tenantId     String
+  tenant       ErpSimTenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId   String
+  soNumber     String
+  customerCode String
+  status       String?
+  lines        ErpSimSalesOrderLine[]
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, soNumber])
+  @@index([tenantId, customerCode])
+}
+
+model ErpSimSalesOrderLine {
+  id            String           @id @default(cuid())
+  salesOrderId  String
+  salesOrder    ErpSimSalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  lineNo        Int
+  productCode   String
+  qty           Decimal          @db.Decimal(30, 10)
+  shippedQty    Decimal?         @db.Decimal(30, 10)
+  requestedDate DateTime?
+
+  @@unique([salesOrderId, lineNo])
 }
 
 model ErpSimScenario {

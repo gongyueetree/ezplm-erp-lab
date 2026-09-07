@@ -97,6 +97,45 @@ export interface ErpEtaUpdate {
   shipDate?: string
 }
 
+// LAB-1: 工单（ECN 影响分析与缺料/齐料闭环的数据源）。
+// consumedLines.materialCode 必须引用 materials；customerCode 引用 customers。
+// productCode 是成品编码——Lab 暂无成品主数据集，保持自由文本（如实标注）。
+export interface ErpWorkOrderLine {
+  materialCode: string
+  consumedQty: DecimalString
+}
+
+export interface ErpWorkOrder {
+  externalId: string
+  woNumber: string
+  customerCode?: string
+  productCode: string
+  bomRef?: string
+  qty: DecimalString
+  status: 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'SHIPPED'
+  currentOperation?: string
+  consumedLines: ErpWorkOrderLine[]
+  plannedStart?: string
+  plannedEnd?: string
+}
+
+// LAB-1: 销售订单（客户需求侧）。customerCode 必须引用 customers。
+export interface ErpSalesOrderLine {
+  lineNo: number
+  productCode: string
+  qty: DecimalString
+  shippedQty?: DecimalString
+  requestedDate?: string
+}
+
+export interface ErpSalesOrder {
+  externalId: string
+  soNumber: string
+  customerCode: string
+  status?: string
+  lines: ErpSalesOrderLine[]
+}
+
 export interface PullOptions {
   updatedSince?: string
   cursor?: string
@@ -118,7 +157,7 @@ export interface ErpWriteResult {
   message?: string
 }
 
-export type DatasetType = 'MATERIAL' | 'INVENTORY' | 'EXCESS' | 'SUPPLIER' | 'CUSTOMER' | 'OPEN_PO' | 'FX'
+export type DatasetType = 'MATERIAL' | 'INVENTORY' | 'EXCESS' | 'SUPPLIER' | 'CUSTOMER' | 'OPEN_PO' | 'FX' | 'WORK_ORDER' | 'SALES_ORDER'
 
 export type ScenarioCode =
   | 'NORMAL'
@@ -134,6 +173,7 @@ export type ScenarioCode =
   | 'PO_ALREADY_EXISTS'
   | 'ERP_500'
   | 'NETWORK_DROP_AFTER_COMMIT'
+  | 'WORK_ORDER_SOURCE_UNAVAILABLE'
 
 export interface ErpSimScenario {
   code: ScenarioCode
@@ -199,6 +239,8 @@ export interface SimulatorDataset {
   customers: ErpCustomer[]
   exchangeRates: ErpExchangeRate[]
   purchaseOrders: ErpPurchaseOrder[]
+  workOrders: ErpWorkOrder[]
+  salesOrders: ErpSalesOrder[]
   scenario: ErpSimScenario
   requestLogs: ErpRequestLog[]
   auditLogs: AuditEntry[]

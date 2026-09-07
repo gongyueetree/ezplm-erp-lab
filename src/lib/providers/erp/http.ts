@@ -88,6 +88,8 @@ export class HttpErpLabProvider implements ErpProvider {
   pullCustomers = (input?: PullOptions) => this.rpc<any>('pullCustomers', { input })
   pullExchangeRates = (input?: PullOptions) => this.rpc<any>('pullExchangeRates', { input })
   pullOpenPurchaseOrders = (input?: PullOptions) => this.rpc<any>('pullOpenPurchaseOrders', { input })
+  pullWorkOrders = (input?: PullOptions) => this.rpc<any>('pullWorkOrders', { input })
+  pullSalesOrders = (input?: PullOptions) => this.rpc<any>('pullSalesOrders', { input })
   createPurchaseOrder = (input: ErpPurchaseOrder, idempotencyKey: string) => this.rpc<any>('createPurchaseOrder', { input, idempotencyKey })
   updateEta = (input: ErpEtaUpdate) => this.rpc<any>('updateEta', { input })
   upsertRecord = (type: Exclude<DatasetType, 'OPEN_PO'>, record: Record<string, unknown>, originalKey?: string) => this.rpc<SimulatorDataset>('upsertRecord', { type, record, originalKey })

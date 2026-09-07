@@ -50,6 +50,18 @@ export function createSeedDataset(tenantId: string): SimulatorDataset {
       { externalId: 'PO-EXT-001', poNumber: 'PO20260828001', supplierCode: 'SUP-DIGIKEY', currency: 'USD', orderDate: '2026-08-28', requestedDate: '2026-09-15', status: 'OPEN', lines: [{ lineNo: 1, materialCode: 'EZ-STM32H743', qty: '1000', unitPrice: '11.84', requestedDate: '2026-09-15', confirmedQty: '1000', eta: '2026-09-13' }] },
       { externalId: 'PO-EXT-002', poNumber: 'PO20260829002', supplierCode: 'SUP-LCSC', currency: 'CNY', orderDate: '2026-08-29', requestedDate: '2026-09-12', status: 'OPEN', lines: [{ lineNo: 1, materialCode: 'EZ-SGM8301', qty: '500', unitPrice: '4.20', requestedDate: '2026-09-12' }, { lineNo: 2, materialCode: 'EZ-USB-C-16P', qty: '3000', unitPrice: '1.86', requestedDate: '2026-09-12' }] },
     ],
+    // LAB-1: 工单。consumedLines.materialCode 全部引用上方 materials；customerCode 引用 customers。
+    // productCode 是成品编码（Lab 暂无成品主数据集，自由文本）；WO-2841/2917 与 excess 的 sourceDocumentId 对应。
+    workOrders: [
+      { externalId: 'WO-EXT-001', woNumber: 'WO-2841', customerCode: 'CUS-ACME', productCode: 'FG-ACME-CTRL-A1', bomRef: 'BOM-CTRL-A1-V3', qty: '300', status: 'COMPLETED', consumedLines: [{ materialCode: 'EZ-STM32H743', consumedQty: '300' }, { materialCode: 'EZ-R-10K-0402', consumedQty: '9600' }, { materialCode: 'EZ-C-100N-0402', consumedQty: '14400' }], plannedStart: '2026-07-01', plannedEnd: '2026-07-15' },
+      { externalId: 'WO-EXT-002', woNumber: 'WO-2917', customerCode: 'CUS-NOVA', productCode: 'FG-NOVA-DAQ-M2', bomRef: 'BOM-DAQ-M2-V1', qty: '120', status: 'IN_PROGRESS', currentOperation: 'SMT 贴片', consumedLines: [{ materialCode: 'EZ-ADS131M04', consumedQty: '480' }, { materialCode: 'EZ-USB-C-16P', consumedQty: '120' }, { materialCode: 'EZ-TPS7A2033', consumedQty: '240' }], plannedStart: '2026-08-20', plannedEnd: '2026-09-18' },
+      { externalId: 'WO-EXT-003', woNumber: 'WO-3006', customerCode: 'CUS-ORBIT', productCode: 'FG-ORBIT-SENSE-S1', bomRef: 'BOM-SENSE-S1-V2', qty: '500', status: 'PLANNED', consumedLines: [{ materialCode: 'EZ-SGM8301', consumedQty: '1000' }, { materialCode: 'EZ-W25Q128', consumedQty: '500' }], plannedStart: '2026-09-22', plannedEnd: '2026-10-10' },
+    ],
+    // LAB-1: 销售订单。customerCode 全部引用 customers；shippedQty ≤ qty。
+    salesOrders: [
+      { externalId: 'SO-EXT-001', soNumber: 'SO20260810001', customerCode: 'CUS-ACME', status: 'PARTIALLY_SHIPPED', lines: [{ lineNo: 1, productCode: 'FG-ACME-CTRL-A1', qty: '300', shippedQty: '200', requestedDate: '2026-09-30' }] },
+      { externalId: 'SO-EXT-002', soNumber: 'SO20260825002', customerCode: 'CUS-NOVA', status: 'OPEN', lines: [{ lineNo: 1, productCode: 'FG-NOVA-DAQ-M2', qty: '120', shippedQty: '0', requestedDate: '2026-10-15' }, { lineNo: 2, productCode: 'FG-NOVA-DAQ-M2-SPARE', qty: '10', requestedDate: '2026-10-15' }] },
+    ],
     scenario: { code: 'NORMAL', enabled: true, latencyMs: 120, failureRate: 0 },
     requestLogs: [],
     auditLogs: [],

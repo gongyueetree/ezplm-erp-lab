@@ -26,7 +26,7 @@ export class BrowserSimulatorRepository implements SimulatorRepository {
   private readonly key: string
 
   constructor(public readonly tenantId = 'ezplm-demo') {
-    this.key = `ezplm:erp-lab:v1:${tenantId}`
+    this.key = `ezplm:erp-lab:v2:${tenantId}`
   }
 
   async load(): Promise<SimulatorDataset> {

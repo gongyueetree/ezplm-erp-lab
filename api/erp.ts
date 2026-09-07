@@ -5,7 +5,7 @@ class ApiError extends Error {
   constructor(public code: string, message: string, public retryable = false, public httpStatus = 500) { super(message) }
 }
 
-type MaintainableType = Exclude<DatasetType, 'OPEN_PO'>
+type MaintainableType = Exclude<DatasetType, 'OPEN_PO' | 'WORK_ORDER' | 'SALES_ORDER'>
 const fields: Record<MaintainableType, keyof SimulatorDataset> = {
   MATERIAL: 'materials', INVENTORY: 'inventory', EXCESS: 'excess', SUPPLIER: 'suppliers', CUSTOMER: 'customers', FX: 'exchangeRates',
 }
@@ -63,6 +63,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'pullCustomers': data = await provider.pullCustomers(payload.input); break
       case 'pullExchangeRates': data = await provider.pullExchangeRates(payload.input); break
       case 'pullOpenPurchaseOrders': data = await provider.pullOpenPurchaseOrders(payload.input); break
+      case 'pullWorkOrders': data = await provider.pullWorkOrders(payload.input); break
+      case 'pullSalesOrders': data = await provider.pullSalesOrders(payload.input); break
       case 'createPurchaseOrder': data = await provider.createPurchaseOrder(payload.input as ErpPurchaseOrder, String(payload.idempotencyKey || '')); break
       case 'updateEta': data = await provider.updateEta(payload.input); break
       case 'upsertRecord': {

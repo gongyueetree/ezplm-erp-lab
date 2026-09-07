@@ -9,8 +9,10 @@ import type {
   ErpMaterial,
   ErpPurchaseOrder,
   ErpRequestLog,
+  ErpSalesOrder,
   ErpSimScenario,
   ErpSupplier,
+  ErpWorkOrder,
   ErpWriteResult,
   PullOptions,
   SimulatorDataset,
@@ -104,6 +106,16 @@ export class KingdeeSimulatorProvider implements ErpProvider {
 
   async pullOpenPurchaseOrders(input: PullOptions = {}): Promise<ErpPurchaseOrder[]> {
     return this.execute('pullOpenPurchaseOrders', input, dataset => this.partial(dataset.purchaseOrders.filter(po => po.status !== 'CLOSED'), dataset, input.limit))
+  }
+
+  // LAB-1: 工单。WORK_ORDER_SOURCE_UNAVAILABLE 场景只打掉本方法（见 scenario-engine）
+  async pullWorkOrders(input: PullOptions = {}): Promise<ErpWorkOrder[]> {
+    return this.execute('pullWorkOrders', input, dataset => this.partial(dataset.workOrders ?? [], dataset, input.limit))
+  }
+
+  // LAB-1: 销售订单
+  async pullSalesOrders(input: PullOptions = {}): Promise<ErpSalesOrder[]> {
+    return this.execute('pullSalesOrders', input, dataset => this.partial(dataset.salesOrders ?? [], dataset, input.limit))
   }
 
   private partial<T>(rows: T[], dataset: SimulatorDataset, limit?: number) {

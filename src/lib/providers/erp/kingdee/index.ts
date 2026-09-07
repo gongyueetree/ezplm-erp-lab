@@ -14,6 +14,8 @@ export class KingdeeK3CloudProvider implements ErpProvider {
   pullCustomers = async () => notReady()
   pullExchangeRates = async () => notReady()
   pullOpenPurchaseOrders = async () => notReady()
+  pullWorkOrders = async () => notReady()
+  pullSalesOrders = async () => notReady()
   createPurchaseOrder = async () => notReady()
   updateEta = async () => notReady()
 }

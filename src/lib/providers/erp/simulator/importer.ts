@@ -5,6 +5,9 @@ const requiredFields: Record<DatasetType, string[]> = {
   EXCESS: ['externalId', 'materialCode', 'bookQty', 'availableQty'], SUPPLIER: ['externalId', 'supplierCode', 'name'],
   CUSTOMER: ['externalId', 'customerCode', 'name'], OPEN_PO: ['supplierCode', 'currency', 'orderDate'],
   FX: ['baseCurrency', 'quoteCurrency', 'rate', 'effectiveDate', 'source'],
+  // LAB-1: 平面导入只覆盖单头字段；consumedLines / lines 属嵌套结构，经种子或 PO 流程维护
+  WORK_ORDER: ['externalId', 'woNumber', 'productCode', 'qty', 'status'],
+  SALES_ORDER: ['externalId', 'soNumber', 'customerCode'],
 }
 
 export const TARGET_FIELDS: Record<DatasetType, string[]> = {
@@ -15,6 +18,8 @@ export const TARGET_FIELDS: Record<DatasetType, string[]> = {
   CUSTOMER: ['externalId', 'customerCode', 'name', 'status', 'updatedAt'],
   OPEN_PO: ['externalId', 'poNumber', 'supplierCode', 'currency', 'orderDate', 'requestedDate', 'status'],
   FX: ['baseCurrency', 'quoteCurrency', 'rate', 'rateType', 'effectiveDate', 'source'],
+  WORK_ORDER: ['externalId', 'woNumber', 'customerCode', 'productCode', 'bomRef', 'qty', 'status', 'currentOperation', 'plannedStart', 'plannedEnd'],
+  SALES_ORDER: ['externalId', 'soNumber', 'customerCode', 'status'],
 }
 
 export function suggestMappings(columns: string[], datasetType: DatasetType) {
@@ -42,10 +47,16 @@ export function importRows(dataset: SimulatorDataset, type: DatasetType, rows: R
   mapped.forEach((item, index) => {
     if (['INVENTORY', 'EXCESS'].includes(type) && !output.materials.some(material => material.materialCode === item.materialCode)) brokenReferences.push({ type: 'Material', value: String(item.materialCode), row: index + 2 })
     if (type === 'OPEN_PO' && !output.suppliers.some(supplier => supplier.supplierCode === item.supplierCode)) brokenReferences.push({ type: 'Supplier', value: String(item.supplierCode), row: index + 2 })
+    // LAB-1: 工单/销售订单的客户引用校验（工单 customerCode 可空，填了就必须存在）
+    if (['WORK_ORDER', 'SALES_ORDER'].includes(type) && item.customerCode && !output.customers.some(customer => customer.customerCode === item.customerCode)) brokenReferences.push({ type: 'Customer', value: String(item.customerCode), row: index + 2 })
   })
 
+  // LAB-1: 平面导入没有嵌套行——给必填的数组字段一个显式空值，而不是留 undefined
+  if (type === 'WORK_ORDER') for (const item of mapped) item.consumedLines = item.consumedLines ?? []
+  if (type === 'SALES_ORDER') for (const item of mapped) item.lines = item.lines ?? []
+
   if (brokenReferences.length === 0) {
-    const key: Record<DatasetType, keyof SimulatorDataset> = { MATERIAL: 'materials', INVENTORY: 'inventory', EXCESS: 'excess', SUPPLIER: 'suppliers', CUSTOMER: 'customers', OPEN_PO: 'purchaseOrders', FX: 'exchangeRates' }
+    const key: Record<DatasetType, keyof SimulatorDataset> = { MATERIAL: 'materials', INVENTORY: 'inventory', EXCESS: 'excess', SUPPLIER: 'suppliers', CUSTOMER: 'customers', OPEN_PO: 'purchaseOrders', FX: 'exchangeRates', WORK_ORDER: 'workOrders', SALES_ORDER: 'salesOrders' }
     const field = key[type]
     ;(output as any)[field] = replace ? mapped : [...(output as any)[field], ...mapped]
     output.datasetName = `Imported snapshot · ${new Date().toLocaleDateString('zh-CN')}`
