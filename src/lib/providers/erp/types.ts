@@ -72,6 +72,8 @@ export interface ErpPurchaseOrderLine {
   unitPrice: DecimalString
   requestedDate?: string
   confirmedQty?: DecimalString
+  /** closed-loop: 累计收货量(receivePurchaseOrder 维护) */
+  receivedQty?: DecimalString
   eta?: string
   shipDate?: string
 }
@@ -136,10 +138,47 @@ export interface ErpSalesOrder {
   lines: ErpSalesOrderLine[]
 }
 
+// closed-loop: 收货(最小闭环:PO → 收货 → 库存增加 → PO 状态推进)
+export interface ErpReceiptLine {
+  lineNo: number
+  materialCode: string
+  qty: DecimalString
+  lotNo?: string
+  warehouseCode?: string
+}
+
+export interface ErpReceipt {
+  externalId: string
+  receiptNumber: string
+  poExternalId: string
+  poNumber?: string
+  receivedAt: string
+  idempotencyKey?: string
+  lines: ErpReceiptLine[]
+}
+
+export interface ErpReceiveInput {
+  poExternalId?: string
+  poNumber?: string
+  lines: { lineNo: number; qty: DecimalString; lotNo?: string; warehouseCode?: string }[]
+}
+
 export interface PullOptions {
   updatedSince?: string
   cursor?: string
   limit?: number
+  // closed-loop: 服务端过滤(数据最小化;门户/影响分析按需取数,不全量拉取)
+  customerCode?: string
+  materialCode?: string
+  warehouseCode?: string
+}
+
+/** 分页信封:pull* 的统一返回。cursor 为不透明串;hasMore=false 时不再翻页 */
+export interface ErpPullPage<T> {
+  items: T[]
+  cursor?: string
+  hasMore: boolean
+  total?: number
 }
 
 export interface ErpConnectionResult {
@@ -189,6 +228,8 @@ export interface ErpRequestLog {
   timestamp: string
   operation: string
   requestId: string
+  /** closed-loop: 主系统传入的关联 id(X-Correlation-Id),两边日志可对齐 */
+  correlationId?: string
   attempt: number
   requestPayload?: unknown
   responsePayload?: unknown
@@ -239,6 +280,7 @@ export interface SimulatorDataset {
   customers: ErpCustomer[]
   exchangeRates: ErpExchangeRate[]
   purchaseOrders: ErpPurchaseOrder[]
+  receipts: ErpReceipt[]
   workOrders: ErpWorkOrder[]
   salesOrders: ErpSalesOrder[]
   scenario: ErpSimScenario

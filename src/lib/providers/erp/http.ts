@@ -1,5 +1,5 @@
 import type { ErpProvider } from './contracts.js'
-import { ErpProviderError, type DatasetType, type ErpEtaUpdate, type ErpPurchaseOrder, type ErpSimScenario, type PullOptions, type SimulatorDataset } from './types.js'
+import { ErpProviderError, type DatasetType, type ErpEtaUpdate, type ErpPurchaseOrder, type ErpReceiveInput, type ErpSimScenario, type PullOptions, type SimulatorDataset } from './types.js'
 
 type ApiEnvelope<T> = { ok: true; data: T } | { ok: false; error?: { code?: string; message?: string; retryable?: boolean } }
 
@@ -62,15 +62,15 @@ export class HttpErpLabProvider implements ErpProvider {
     try { return JSON.parse(text) }
     catch { throw new ErpProviderError('HEALTH_CHECK_ERROR', `健康检查返回异常（HTTP ${response.status}）`, true, response.status) }
   }
-  async importCustomerSnapshot(type: Exclude<DatasetType, 'FX'>, file: File): Promise<{ type: string; rowsRead: number; recordsImported: number; inferredMaterials: number; inferredSuppliers: number; warnings: string[] }> {
+  async importCustomerSnapshot(type: DatasetType, file: File, mode: 'STRICT_UAT' | 'DEMO_LENIENT' = 'STRICT_UAT'): Promise<{ type: string; mode: string; rowsRead: number; rowsAccepted: number; rowsRejected: number; inferredMaterials: number; inferredSuppliers: number; warnings: string[]; brokenReferences: { type: string; value: string; row: number }[]; invalidDecimals: { row: number; field: string; value: string }[]; invalidDates: { row: number; field: string; value: string }[] }> {
     const token = sessionStorage.getItem('ezplm:erp-lab:access-token')
     if (!token) throw new ErpProviderError('ERP_LAB_UNAUTHORIZED', '请先在右上角设置 ERP Lab 管理凭证', false, 401)
-    const response = await fetchApi(`/api/snapshot?tenantId=${encodeURIComponent(this.tenantId)}&type=${encodeURIComponent(type)}`, {
+    const response = await fetchApi(`/api/snapshot?tenantId=${encodeURIComponent(this.tenantId)}&type=${encodeURIComponent(type)}&mode=${mode}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', Authorization: `Bearer ${token}` },
       body: file,
     }, 60_000)
-    const result = await readApiResponse<{ type: string; rowsRead: number; recordsImported: number; inferredMaterials: number; inferredSuppliers: number; warnings: string[] }>(response)
+    const result = await readApiResponse<Awaited<ReturnType<HttpErpLabProvider['importCustomerSnapshot']>>>(response)
     if (!response.ok || !result.ok) {
       const error = result.ok ? undefined : result.error
       throw new ErpProviderError(error?.code || 'SNAPSHOT_IMPORT_ERROR', error?.message || '客户参考数据导入失败', false, response.status)
@@ -92,6 +92,7 @@ export class HttpErpLabProvider implements ErpProvider {
   pullSalesOrders = (input?: PullOptions) => this.rpc<any>('pullSalesOrders', { input })
   createPurchaseOrder = (input: ErpPurchaseOrder, idempotencyKey: string) => this.rpc<any>('createPurchaseOrder', { input, idempotencyKey })
   updateEta = (input: ErpEtaUpdate) => this.rpc<any>('updateEta', { input })
+  receivePurchaseOrder = (input: ErpReceiveInput, idempotencyKey: string) => this.rpc<any>('receivePurchaseOrder', { input, idempotencyKey })
   upsertRecord = (type: Exclude<DatasetType, 'OPEN_PO'>, record: Record<string, unknown>, originalKey?: string) => this.rpc<SimulatorDataset>('upsertRecord', { type, record, originalKey })
   deleteRecord = (type: Exclude<DatasetType, 'OPEN_PO'>, key: string) => this.rpc<SimulatorDataset>('deleteRecord', { type, key })
 }

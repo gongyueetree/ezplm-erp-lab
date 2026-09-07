@@ -18,6 +18,7 @@ class NotConfiguredProvider implements ErpProvider {
   pullSalesOrders = this.fail
   createPurchaseOrder = this.fail
   updateEta = this.fail
+  receivePurchaseOrder = this.fail
 }
 
 export function getErpProvider(mode: string, repository?: SimulatorRepository): ErpProvider {

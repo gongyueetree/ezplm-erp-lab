@@ -50,6 +50,7 @@ export function createSeedDataset(tenantId: string): SimulatorDataset {
       { externalId: 'PO-EXT-001', poNumber: 'PO20260828001', supplierCode: 'SUP-DIGIKEY', currency: 'USD', orderDate: '2026-08-28', requestedDate: '2026-09-15', status: 'OPEN', lines: [{ lineNo: 1, materialCode: 'EZ-STM32H743', qty: '1000', unitPrice: '11.84', requestedDate: '2026-09-15', confirmedQty: '1000', eta: '2026-09-13' }] },
       { externalId: 'PO-EXT-002', poNumber: 'PO20260829002', supplierCode: 'SUP-LCSC', currency: 'CNY', orderDate: '2026-08-29', requestedDate: '2026-09-12', status: 'OPEN', lines: [{ lineNo: 1, materialCode: 'EZ-SGM8301', qty: '500', unitPrice: '4.20', requestedDate: '2026-09-12' }, { lineNo: 2, materialCode: 'EZ-USB-C-16P', qty: '3000', unitPrice: '1.86', requestedDate: '2026-09-12' }] },
     ],
+    receipts: [],
     // LAB-1: 工单。consumedLines.materialCode 全部引用上方 materials；customerCode 引用 customers。
     // productCode 是成品编码（Lab 暂无成品主数据集，自由文本）；WO-2841/2917 与 excess 的 sourceDocumentId 对应。
     workOrders: [

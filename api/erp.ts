@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import type { DatasetType, ErpPurchaseOrder, ErpSimScenario, SimulatorDataset } from '../src/lib/providers/erp/types.js'
+import type { DatasetType, ErpPurchaseOrder, ErpReceiveInput, ErpSimScenario, SimulatorDataset } from '../src/lib/providers/erp/types.js'
 
 class ApiError extends Error {
   constructor(public code: string, message: string, public retryable = false, public httpStatus = 500) { super(message) }
@@ -37,15 +37,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (!process.env.DATABASE_URL) throw new ApiError('DATABASE_NOT_CONFIGURED', '服务端尚未配置 DATABASE_URL，请先连接 PostgreSQL 并执行 Prisma migration。', false, 503)
     const tenantId = tenantFrom(req)
-    if (req.method === 'POST' && process.env.NODE_ENV === 'production') {
+
+    /*
+     * closed-loop P0-1:客户脱敏数据不允许匿名读取。
+     * - 仅 PUBLIC_DEMO_TENANTS(默认 ezplm-demo)允许匿名 GET —— Golden Demo 不受影响;
+     * - 其余任何租户(即客户快照所在租户)GET/POST 一律要求 Bearer,**任何环境**都不放开;
+     * - demo 租户的 POST 保持原规则(生产要求 token)。
+     */
+    const publicTenants = new Set((process.env.PUBLIC_DEMO_TENANTS ?? 'ezplm-demo').split(',').map(t => t.trim()).filter(Boolean))
+    const requiresAuth = !publicTenants.has(tenantId) || (req.method === 'POST' && process.env.NODE_ENV === 'production')
+    if (requiresAuth) {
       const configuredToken = process.env.ERP_LAB_ACCESS_TOKEN
-      if (!configuredToken) throw new ApiError('ERP_LAB_ACCESS_TOKEN_NOT_CONFIGURED', '服务端尚未配置 ERP_LAB_ACCESS_TOKEN', false, 503)
+      if (!configuredToken) throw new ApiError('ERP_LAB_ACCESS_TOKEN_NOT_CONFIGURED', '服务端尚未配置 ERP_LAB_ACCESS_TOKEN —— 非公开租户在配置令牌前不可访问(fail-closed)', false, 503)
       if (req.headers.authorization !== `Bearer ${configuredToken}`) throw new ApiError('ERP_LAB_UNAUTHORIZED', '需要有效的 ERP Lab 管理凭证', false, 401)
     }
     const [{ KingdeeSimulatorProvider }, { PrismaSimulatorRepository }] = await Promise.all([
       import('../src/lib/providers/erp/simulator/index.js'), import('../server/prisma-simulator-repository.js'),
     ])
     const provider = new KingdeeSimulatorProvider(new PrismaSimulatorRepository(tenantId))
+    // closed-loop P1-10:主系统传入的关联 id,写进每条请求日志(两边可对齐)
+    const correlation = req.headers['x-correlation-id']
+    if (typeof correlation === 'string' && correlation.length <= 80) provider.correlationId = correlation
     if (req.method === 'GET') return res.status(200).json({ ok: true, data: await provider.getDataset() })
     if (req.method !== 'POST') return res.status(405).json({ ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET or POST' } })
 
@@ -67,6 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'pullSalesOrders': data = await provider.pullSalesOrders(payload.input); break
       case 'createPurchaseOrder': data = await provider.createPurchaseOrder(payload.input as ErpPurchaseOrder, String(payload.idempotencyKey || '')); break
       case 'updateEta': data = await provider.updateEta(payload.input); break
+      case 'receivePurchaseOrder': data = await provider.receivePurchaseOrder(payload.input as ErpReceiveInput, String(payload.idempotencyKey || '')); break
       case 'upsertRecord': {
         const type = payload.type as MaintainableType
         if (!fields[type]) throw new ApiError('INVALID_DATASET_TYPE', '该数据集不能通过通用编辑器维护', false, 400)

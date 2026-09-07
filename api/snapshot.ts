@@ -1,10 +1,10 @@
 import { timingSafeEqual } from 'node:crypto'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import type { CustomerSnapshotType } from '../server/customer-snapshot-import.js'
+import type { CustomerSnapshotType, ImportMode } from '../server/customer-snapshot-import.js'
 
 export const config = { api: { bodyParser: false }, maxDuration: 60 }
 
-const allowedTypes = new Set<CustomerSnapshotType>(['MATERIAL', 'INVENTORY', 'EXCESS', 'SUPPLIER', 'CUSTOMER', 'OPEN_PO'])
+const allowedTypes = new Set<CustomerSnapshotType>(['MATERIAL', 'INVENTORY', 'EXCESS', 'SUPPLIER', 'CUSTOMER', 'OPEN_PO', 'FX'])
 const safeMessage = (error: unknown) => (error instanceof Error ? error.message : 'Unknown import error').replace(/postgres(?:ql)?:\/\/[^\s]+/gi, '[DATABASE_URL]').slice(0, 500)
 
 const authorized = (req: VercelRequest) => {
@@ -37,7 +37,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const tenantId = String(req.query.tenantId ?? 'ezplm-demo')
     const body = await readBody(req)
     const { importCustomerSnapshot } = await import('../server/customer-snapshot-import.js')
-    return res.status(200).json({ ok: true, data: await importCustomerSnapshot(tenantId, type, body) })
+    // closed-loop P0-3:默认 STRICT_UAT —— 静默纠偏是错误;DEMO_LENIENT 须显式指定
+    const mode: ImportMode = req.query.mode === 'DEMO_LENIENT' ? 'DEMO_LENIENT' : 'STRICT_UAT'
+    return res.status(200).json({ ok: true, data: await importCustomerSnapshot(tenantId, type, body, mode) })
   } catch (error) {
     return res.status(500).json({ ok: false, error: { code: 'SNAPSHOT_IMPORT_ERROR', message: safeMessage(error), retryable: false } })
   }
