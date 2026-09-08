@@ -76,6 +76,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'pullExchangeRates': data = await provider.pullExchangeRates(payload.input); break
       case 'pullOpenPurchaseOrders': data = await provider.pullOpenPurchaseOrders(payload.input); break
       case 'pullWorkOrders': data = await provider.pullWorkOrders(payload.input); break
+      case 'pullInventoryMovements': data = await provider.pullInventoryMovements(payload.input); break
+      case 'pullInventoryLots': data = await provider.pullInventoryLots(payload.input); break
       case 'pullSalesOrders': data = await provider.pullSalesOrders(payload.input); break
       case 'createPurchaseOrder': data = await provider.createPurchaseOrder(payload.input as ErpPurchaseOrder, String(payload.idempotencyKey || '')); break
       case 'updateEta': data = await provider.updateEta(payload.input); break

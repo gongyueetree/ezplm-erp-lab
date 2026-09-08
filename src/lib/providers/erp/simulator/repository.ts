@@ -7,6 +7,8 @@ import {
   memQueryInventory,
   memQueryMaterials,
   memQueryOpenPos,
+  memQueryLots,
+  memQueryMovements,
   memQuerySalesOrders,
   memQuerySuppliers,
   memQueryWorkOrders,
@@ -18,6 +20,8 @@ import type {
   ErpExcess,
   ErpExchangeRate,
   ErpInventory,
+  ErpInventoryLot,
+  ErpInventoryMovement,
   ErpMaterial,
   ErpPurchaseOrder,
   ErpSalesOrder,
@@ -43,6 +47,8 @@ export interface SimulatorRepository {
   queryOpenPurchaseOrders(q: PageQuery): Promise<PagedRows<ErpPurchaseOrder>>
   queryWorkOrders(q: PageQuery): Promise<PagedRows<ErpWorkOrder>>
   querySalesOrders(q: PageQuery): Promise<PagedRows<ErpSalesOrder>>
+  queryMovements(q: PageQuery): Promise<PagedRows<ErpInventoryMovement>>
+  queryLots(q: PageQuery): Promise<PagedRows<ErpInventoryLot>>
 }
 
 /** 内存查询混入:Memory/Browser 仓储共用(数据量小,语义与 DB 版一致) */
@@ -56,6 +62,7 @@ const REQUEST_LOG_CAP = 250
 abstract class InMemoryQueryBase implements Pick<SimulatorRepository,
   'queryMaterials' | 'queryInventory' | 'queryExcess' | 'querySuppliers' | 'queryCustomers' |
   'queryExchangeRates' | 'queryOpenPurchaseOrders' | 'queryWorkOrders' | 'querySalesOrders' |
+  'queryMovements' | 'queryLots' |
   'getScenario' | 'appendRequestLog'> {
   abstract load(): Promise<SimulatorDataset>
   abstract save(dataset: SimulatorDataset): Promise<void>
@@ -76,6 +83,8 @@ abstract class InMemoryQueryBase implements Pick<SimulatorRepository,
   async queryOpenPurchaseOrders(q: PageQuery) { return memQueryOpenPos((await memQueries(this)).purchaseOrders, q) }
   async queryWorkOrders(q: PageQuery) { return memQueryWorkOrders((await memQueries(this)).workOrders ?? [], q) }
   async querySalesOrders(q: PageQuery) { return memQuerySalesOrders((await memQueries(this)).salesOrders ?? [], q) }
+  async queryMovements(q: PageQuery) { return memQueryMovements((await memQueries(this)).movements ?? [], q) }
+  async queryLots(q: PageQuery) { return memQueryLots((await memQueries(this)).lots ?? [], q) }
 }
 
 export class MemorySimulatorRepository extends InMemoryQueryBase implements SimulatorRepository {

@@ -51,6 +51,18 @@ export function createSeedDataset(tenantId: string): SimulatorDataset {
       { externalId: 'PO-EXT-002', poNumber: 'PO20260829002', supplierCode: 'SUP-LCSC', currency: 'CNY', orderDate: '2026-08-29', requestedDate: '2026-09-12', status: 'OPEN', lines: [{ lineNo: 1, materialCode: 'EZ-SGM8301', qty: '500', unitPrice: '4.20', requestedDate: '2026-09-12' }, { lineNo: 2, materialCode: 'EZ-USB-C-16P', qty: '3000', unitPrice: '1.86', requestedDate: '2026-09-12' }] },
     ],
     receipts: [],
+    movements: [
+      { externalId: 'MV-001', materialCode: 'EZ-STM32H743', movementType: 'IN', qty: '500', warehouseCode: 'SZ-RM', lotNo: 'L240812', customerCode: 'CUS-ACME', refDocType: 'RECEIPT', refDocNo: 'RCV-88001', occurredAt: '2026-08-12T02:00:00.000Z' },
+      { externalId: 'MV-002', materialCode: 'EZ-STM32H743', movementType: 'OUT', qty: '120', warehouseCode: 'SZ-RM', lotNo: 'L240812', customerCode: 'CUS-ACME', refDocType: 'WORK_ORDER', refDocNo: 'WO-2841', occurredAt: '2026-08-20T06:30:00.000Z' },
+      { externalId: 'MV-003', materialCode: 'EZ-USB-C-16P', movementType: 'IN', qty: '4000', warehouseCode: 'SZ-RM', customerCode: 'CUS-NOVA', refDocType: 'RECEIPT', refDocNo: 'RCV-88002', occurredAt: '2026-08-25T01:10:00.000Z' },
+      { externalId: 'MV-004', materialCode: 'EZ-R-10K-0402', movementType: 'ADJUST', qty: '-500', warehouseCode: 'SZ-RM', refDocType: 'STOCKTAKE', refDocNo: 'ST-0912', occurredAt: '2026-09-01T09:00:00.000Z' },
+    ],
+    lots: [
+      { externalId: 'LOT-001', lotNo: 'L240812', materialCode: 'EZ-STM32H743', qty: '380', warehouseCode: 'SZ-RM', customerCode: 'CUS-ACME', supplierCode: 'SUP-DIGIKEY', receivedAt: '2026-08-12', expiresAt: '2028-08-12', status: 'AVAILABLE' },
+      { externalId: 'LOT-002', lotNo: 'L240921', materialCode: 'EZ-ADS131M04', qty: '450', warehouseCode: 'SZ-RM', customerCode: 'CUS-ACME', supplierCode: 'SUP-MOUSER', receivedAt: '2026-09-21', status: 'AVAILABLE' },
+      { externalId: 'LOT-003', lotNo: 'L240715', materialCode: 'EZ-USB-C-16P', qty: '8200', warehouseCode: 'SZ-RM', customerCode: 'CUS-NOVA', supplierCode: 'SUP-LCSC', receivedAt: '2026-07-15', status: 'AVAILABLE' },
+      { externalId: 'LOT-004', lotNo: 'L240320', materialCode: 'EZ-SGM8301', qty: '0', warehouseCode: 'SZ-RM', customerCode: 'CUS-ACME', supplierCode: 'SUP-LCSC', receivedAt: '2026-03-20', status: 'CONSUMED' },
+    ],
     // LAB-1: 工单。consumedLines.materialCode 全部引用上方 materials；customerCode 引用 customers。
     // productCode 是成品编码（Lab 暂无成品主数据集，自由文本）；WO-2841/2917 与 excess 的 sourceDocumentId 对应。
     workOrders: [

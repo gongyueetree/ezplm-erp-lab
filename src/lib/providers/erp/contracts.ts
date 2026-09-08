@@ -5,6 +5,8 @@ import type {
   ErpExchangeRate,
   ErpExcess,
   ErpInventory,
+  ErpInventoryLot,
+  ErpInventoryMovement,
   ErpMaterial,
   ErpPullPage,
   ErpPurchaseOrder,
@@ -34,6 +36,9 @@ export interface ErpProvider {
   pullOpenPurchaseOrders(input?: PullOptions): Promise<ErpPullPage<ErpPurchaseOrder>>
   pullWorkOrders(input?: PullOptions): Promise<ErpPullPage<ErpWorkOrder>>
   pullSalesOrders(input?: PullOptions): Promise<ErpPullPage<ErpSalesOrder>>
+  /** R3-7:库存异动/批次(门户 Transactions/Lots 数据源) */
+  pullInventoryMovements(input?: PullOptions): Promise<ErpPullPage<ErpInventoryMovement>>
+  pullInventoryLots(input?: PullOptions): Promise<ErpPullPage<ErpInventoryLot>>
   createPurchaseOrder(input: ErpPurchaseOrder, idempotencyKey: string): Promise<ErpWriteResult>
   updateEta(input: ErpEtaUpdate): Promise<ErpWriteResult>
   receivePurchaseOrder(input: ErpReceiveInput, idempotencyKey: string): Promise<ErpWriteResult>

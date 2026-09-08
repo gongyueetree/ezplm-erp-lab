@@ -37,6 +37,8 @@ export class PrismaSimulatorRepository implements SimulatorRepository {
       receipts: tenant.receipts.map(r => ({ externalId: r.externalId, receiptNumber: r.receiptNumber, poExternalId: r.poExternalId, poNumber: r.poNumber ?? undefined, receivedAt: r.receivedAt.toISOString(), idempotencyKey: r.idempotencyKey ?? undefined, lines: r.lines.map(line => ({ lineNo: line.lineNo, materialCode: line.materialCode, qty: line.qty.toString(), lotNo: line.lotNo ?? undefined, warehouseCode: line.warehouseCode ?? undefined })) })),
       workOrders: tenant.workOrders.map(wo => ({ externalId: wo.externalId, woNumber: wo.woNumber, customerCode: wo.customerCode ?? undefined, productCode: wo.productCode, bomRef: wo.bomRef ?? undefined, qty: wo.qty.toString(), status: wo.status as ErpWorkOrder['status'], currentOperation: wo.currentOperation ?? undefined, consumedLines: wo.consumedLines.map(line => ({ materialCode: line.materialCode, consumedQty: line.consumedQty.toString() })), plannedStart: iso(wo.plannedStart)?.slice(0, 10), plannedEnd: iso(wo.plannedEnd)?.slice(0, 10) })),
       salesOrders: tenant.salesOrders.map(so => ({ externalId: so.externalId, soNumber: so.soNumber, customerCode: so.customerCode, status: so.status ?? undefined, lines: so.lines.map(line => ({ lineNo: line.lineNo, productCode: line.productCode, qty: line.qty.toString(), shippedQty: line.shippedQty?.toString(), requestedDate: iso(line.requestedDate)?.slice(0, 10) })) })),
+      movements: tenant.movements.map(row => ({ externalId: row.externalId, materialCode: row.materialCode, movementType: row.movementType as 'IN' | 'OUT' | 'TRANSFER' | 'ADJUST', qty: row.qty.toString(), warehouseCode: row.warehouseCode ?? undefined, lotNo: row.lotNo ?? undefined, customerCode: row.customerCode ?? undefined, refDocType: row.refDocType ?? undefined, refDocNo: row.refDocNo ?? undefined, occurredAt: row.occurredAt.toISOString() })),
+      lots: tenant.lots.map(row => ({ externalId: row.externalId, lotNo: row.lotNo, materialCode: row.materialCode, qty: row.qty.toString(), warehouseCode: row.warehouseCode ?? undefined, customerCode: row.customerCode ?? undefined, supplierCode: row.supplierCode ?? undefined, receivedAt: iso(row.receivedAt)?.slice(0, 10), expiresAt: iso(row.expiresAt)?.slice(0, 10), status: (row.status ?? undefined) as 'AVAILABLE' | 'HOLD' | 'CONSUMED' | undefined })),
       scenario: tenant.scenario ? { code: tenant.scenario.code as ScenarioCode, enabled: tenant.scenario.enabled, latencyMs: tenant.scenario.latencyMs, failureRate: tenant.scenario.failureRate, targetOperation: tenant.scenario.targetOperation ?? undefined } : { code: 'NORMAL', enabled: true, latencyMs: 120, failureRate: 0 },
       requestLogs: tenant.requestLogs.map(row => ({ id: row.id, tenantId: row.tenantId, timestamp: row.timestamp.toISOString(), operation: row.operation, requestId: row.requestId, correlationId: row.correlationId ?? undefined, attempt: row.attempt, requestPayload: row.requestPayload, responsePayload: row.responsePayload, latency: row.latency, scenario: row.scenario as ScenarioCode, result: row.result as 'SUCCESS' | 'FAILED' | 'COMMITTED_NO_RESPONSE', errorCode: row.errorCode ?? undefined, errorMessage: row.errorMessage ?? undefined })),
       auditLogs: tenant.auditLogs.map(row => ({ id: row.id, tenantId: row.tenantId, timestamp: row.timestamp.toISOString(), actor: row.actor, action: row.action, entityType: row.entityType, entityId: row.entityId ?? undefined, result: row.result as 'SUCCESS' | 'FAILED', details: row.details ?? undefined })),
@@ -55,6 +57,7 @@ export class PrismaSimulatorRepository implements SimulatorRepository {
         tx.erpSimPurchaseOrder.deleteMany({ where: { tenantId: this.tenantId } }), tx.erpSimRequestLog.deleteMany({ where: { tenantId: this.tenantId } }),
         tx.erpSimWorkOrder.deleteMany({ where: { tenantId: this.tenantId } }), tx.erpSimSalesOrder.deleteMany({ where: { tenantId: this.tenantId } }),
         tx.erpSimReceipt.deleteMany({ where: { tenantId: this.tenantId } }),
+        tx.erpSimMovement.deleteMany({ where: { tenantId: this.tenantId } }), tx.erpSimLot.deleteMany({ where: { tenantId: this.tenantId } }),
         tx.erpSimAuditLog.deleteMany({ where: { tenantId: this.tenantId } }), tx.erpSimMappingProfile.deleteMany({ where: { tenantId: this.tenantId } }),
       ])
       await tx.erpSimScenario.upsert({ where: { tenantId: this.tenantId }, create: { tenantId: this.tenantId, ...dataset.scenario }, update: dataset.scenario })
@@ -69,6 +72,8 @@ export class PrismaSimulatorRepository implements SimulatorRepository {
       for (const wo of dataset.workOrders ?? []) await tx.erpSimWorkOrder.create({ data: { tenantId: this.tenantId, externalId: wo.externalId, woNumber: wo.woNumber, customerCode: wo.customerCode, productCode: wo.productCode, bomRef: wo.bomRef, qty: wo.qty, status: wo.status, currentOperation: wo.currentOperation, plannedStart: date(wo.plannedStart), plannedEnd: date(wo.plannedEnd), consumedLines: { create: (wo.consumedLines ?? []).map(line => ({ materialCode: line.materialCode, consumedQty: line.consumedQty })) } } })
       for (const so of dataset.salesOrders ?? []) await tx.erpSimSalesOrder.create({ data: { tenantId: this.tenantId, externalId: so.externalId, soNumber: so.soNumber, customerCode: so.customerCode, status: so.status, lines: { create: (so.lines ?? []).map(line => ({ lineNo: line.lineNo, productCode: line.productCode, qty: line.qty, shippedQty: line.shippedQty, requestedDate: date(line.requestedDate) })) } } })
       for (const r of dataset.receipts ?? []) await tx.erpSimReceipt.create({ data: { tenantId: this.tenantId, externalId: r.externalId, receiptNumber: r.receiptNumber, poExternalId: r.poExternalId, poNumber: r.poNumber, receivedAt: new Date(r.receivedAt), idempotencyKey: r.idempotencyKey, lines: { create: r.lines.map(line => ({ lineNo: line.lineNo, materialCode: line.materialCode, qty: line.qty, lotNo: line.lotNo, warehouseCode: line.warehouseCode })) } } })
+      if ((dataset.movements ?? []).length) await tx.erpSimMovement.createMany({ data: (dataset.movements ?? []).map(row => ({ tenantId: this.tenantId, externalId: row.externalId, materialCode: row.materialCode, movementType: row.movementType, qty: row.qty, warehouseCode: row.warehouseCode, lotNo: row.lotNo, customerCode: row.customerCode, refDocType: row.refDocType, refDocNo: row.refDocNo, occurredAt: new Date(row.occurredAt) })) })
+      if ((dataset.lots ?? []).length) await tx.erpSimLot.createMany({ data: (dataset.lots ?? []).map(row => ({ tenantId: this.tenantId, externalId: row.externalId, lotNo: row.lotNo, materialCode: row.materialCode, qty: row.qty, warehouseCode: row.warehouseCode, customerCode: row.customerCode, supplierCode: row.supplierCode, receivedAt: date(row.receivedAt), expiresAt: date(row.expiresAt), status: row.status })) })
       if (dataset.requestLogs.length) await tx.erpSimRequestLog.createMany({ data: dataset.requestLogs.map(row => ({ id: row.id, tenantId: this.tenantId, timestamp: new Date(row.timestamp), operation: row.operation, requestId: row.requestId, correlationId: row.correlationId ?? undefined, attempt: row.attempt, requestPayload: json(row.requestPayload), responsePayload: json(row.responsePayload), latency: row.latency, scenario: row.scenario, result: row.result, errorCode: row.errorCode, errorMessage: row.errorMessage })) })
       if (dataset.auditLogs.length) await tx.erpSimAuditLog.createMany({ data: dataset.auditLogs.map(row => ({ id: row.id, tenantId: this.tenantId, timestamp: new Date(row.timestamp), actor: row.actor, action: row.action, entityType: row.entityType, entityId: row.entityId, result: row.result, details: row.details })) })
       if (dataset.mappingProfiles.length) await tx.erpSimMappingProfile.createMany({ data: dataset.mappingProfiles.map(row => ({ id: row.id, tenantId: this.tenantId, name: row.name, datasetType: row.datasetType, mappings: row.mappings as Prisma.InputJsonValue, createdAt: new Date(row.createdAt) })) })
@@ -179,7 +184,36 @@ export class PrismaSimulatorRepository implements SimulatorRepository {
     return { items: rows.map(so => ({ externalId: so.externalId, soNumber: so.soNumber, customerCode: so.customerCode, status: so.status ?? undefined, lines: so.lines.map(line => ({ lineNo: line.lineNo, productCode: line.productCode, qty: line.qty.toString(), shippedQty: line.shippedQty?.toString(), requestedDate: iso(line.requestedDate)?.slice(0, 10) })) })), total }
   }
 
+  async queryMovements(q: PageQuery): Promise<PagedRows<import('../src/lib/providers/erp/types.js').ErpInventoryMovement>> {
+    const where = {
+      tenantId: this.tenantId,
+      ...(q.customerCode ? { customerCode: { equals: q.customerCode, mode: 'insensitive' as const } } : {}),
+      ...(q.materialCode ? { materialCode: { equals: q.materialCode, mode: 'insensitive' as const } } : {}),
+      ...(q.warehouseCode ? { warehouseCode: { equals: q.warehouseCode, mode: 'insensitive' as const } } : {}),
+      ...(q.updatedSince ? { occurredAt: { gte: new Date(q.updatedSince) } } : {}),
+    }
+    const [rows, total] = await Promise.all([
+      this.db.erpSimMovement.findMany({ where, orderBy: { occurredAt: 'desc' }, ...this.page(q) }),
+      this.db.erpSimMovement.count({ where }),
+    ])
+    return { items: rows.map(row => ({ externalId: row.externalId, materialCode: row.materialCode, movementType: row.movementType as 'IN' | 'OUT' | 'TRANSFER' | 'ADJUST', qty: row.qty.toString(), warehouseCode: row.warehouseCode ?? undefined, lotNo: row.lotNo ?? undefined, customerCode: row.customerCode ?? undefined, refDocType: row.refDocType ?? undefined, refDocNo: row.refDocNo ?? undefined, occurredAt: row.occurredAt.toISOString() })), total }
+  }
+
+  async queryLots(q: PageQuery): Promise<PagedRows<import('../src/lib/providers/erp/types.js').ErpInventoryLot>> {
+    const where = {
+      tenantId: this.tenantId,
+      ...(q.customerCode ? { customerCode: { equals: q.customerCode, mode: 'insensitive' as const } } : {}),
+      ...(q.materialCode ? { materialCode: { equals: q.materialCode, mode: 'insensitive' as const } } : {}),
+      ...(q.warehouseCode ? { warehouseCode: { equals: q.warehouseCode, mode: 'insensitive' as const } } : {}),
+    }
+    const [rows, total] = await Promise.all([
+      this.db.erpSimLot.findMany({ where, orderBy: { lotNo: 'asc' }, ...this.page(q) }),
+      this.db.erpSimLot.count({ where }),
+    ])
+    return { items: rows.map(row => ({ externalId: row.externalId, lotNo: row.lotNo, materialCode: row.materialCode, qty: row.qty.toString(), warehouseCode: row.warehouseCode ?? undefined, customerCode: row.customerCode ?? undefined, supplierCode: row.supplierCode ?? undefined, receivedAt: iso(row.receivedAt)?.slice(0, 10), expiresAt: iso(row.expiresAt)?.slice(0, 10), status: (row.status ?? undefined) as 'AVAILABLE' | 'HOLD' | 'CONSUMED' | undefined })), total }
+  }
+
   private readTenant() {
-    return this.db.erpSimTenant.findUnique({ where: { id: this.tenantId }, include: { materials: true, inventory: true, excess: true, suppliers: true, customers: true, exchangeRates: true, purchaseOrders: { include: { lines: { orderBy: { lineNo: 'asc' } } }, orderBy: { orderDate: 'asc' } }, workOrders: { include: { consumedLines: true }, orderBy: { woNumber: 'asc' } }, receipts: { include: { lines: { orderBy: { lineNo: 'asc' } } }, orderBy: { receivedAt: 'asc' } }, salesOrders: { include: { lines: { orderBy: { lineNo: 'asc' } } }, orderBy: { soNumber: 'asc' } }, scenario: true, requestLogs: { orderBy: { timestamp: 'desc' }, take: 250 }, auditLogs: { orderBy: { timestamp: 'desc' }, take: 250 }, mappingProfiles: true } })
+    return this.db.erpSimTenant.findUnique({ where: { id: this.tenantId }, include: { materials: true, inventory: true, excess: true, movements: true, lots: true, suppliers: true, customers: true, exchangeRates: true, purchaseOrders: { include: { lines: { orderBy: { lineNo: 'asc' } } }, orderBy: { orderDate: 'asc' } }, workOrders: { include: { consumedLines: true }, orderBy: { woNumber: 'asc' } }, receipts: { include: { lines: { orderBy: { lineNo: 'asc' } } }, orderBy: { receivedAt: 'asc' } }, salesOrders: { include: { lines: { orderBy: { lineNo: 'asc' } } }, orderBy: { soNumber: 'asc' } }, scenario: true, requestLogs: { orderBy: { timestamp: 'desc' }, take: 250 }, auditLogs: { orderBy: { timestamp: 'desc' }, take: 250 }, mappingProfiles: true } })
   }
 }

@@ -25,6 +25,8 @@ model ErpSimTenant {
   receipts         ErpSimReceipt[]
   workOrders       ErpSimWorkOrder[]
   salesOrders      ErpSimSalesOrder[]
+  movements        ErpSimMovement[]
+  lots             ErpSimLot[]
   scenario         ErpSimScenario?
   requestLogs      ErpSimRequestLog[]
   auditLogs        ErpSimAuditLog[]
@@ -286,6 +288,48 @@ model ErpSimSalesOrderLine {
   requestedDate DateTime?
 
   @@unique([salesOrderId, lineNo])
+}
+
+/// R3-7:库存异动(门户 Transactions 数据源)
+model ErpSimMovement {
+  id            String       @id @default(cuid())
+  tenantId      String
+  tenant        ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId    String
+  materialCode  String
+  movementType  String
+  qty           Decimal      @db.Decimal(30, 10)
+  warehouseCode String?
+  lotNo         String?
+  customerCode  String?
+  refDocType    String?
+  refDocNo      String?
+  occurredAt    DateTime
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, materialCode])
+  @@index([tenantId, customerCode])
+}
+
+/// R3-7:库存批次(门户 Lots 数据源)
+model ErpSimLot {
+  id            String       @id @default(cuid())
+  tenantId      String
+  tenant        ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId    String
+  lotNo         String
+  materialCode  String
+  qty           Decimal      @db.Decimal(30, 10)
+  warehouseCode String?
+  customerCode  String?
+  supplierCode  String?
+  receivedAt    DateTime?
+  expiresAt     DateTime?
+  status        String?
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, materialCode])
+  @@index([tenantId, customerCode])
 }
 
 model ErpSimScenario {
