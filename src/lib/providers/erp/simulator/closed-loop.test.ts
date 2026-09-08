@@ -117,3 +117,34 @@ describe('closed-loop · correlationId(P1-10)', () => {
     expect(logs[0].correlationId).toBe('main-corr-123')
   })
 })
+
+describe('R3-7 · 库存异动/批次(门户 Transactions/Lots 数据源)', () => {
+  it('pullInventoryMovements:customerCode 服务端过滤;occurredAt 倒序语义由消费方决定,分页信封完整', async () => {
+    const provider = makeProvider()
+    const acme = await provider.pullInventoryMovements({ customerCode: 'CUS-ACME' })
+    expect(acme.items.length).toBe(2)
+    expect(acme.items.every(m => m.customerCode === 'CUS-ACME')).toBe(true)
+    expect(acme.hasMore).toBe(false)
+    expect(acme.total).toBe(2)
+    // 未指定客户 → 含无客户归属的调整行
+    const all = await provider.pullInventoryMovements({})
+    expect(all.total).toBe(4)
+    // 翻页
+    const p1 = await provider.pullInventoryMovements({ limit: 3 })
+    expect(p1.hasMore).toBe(true)
+    const p2 = await provider.pullInventoryMovements({ limit: 3, cursor: p1.cursor })
+    expect(p2.items.length).toBe(1)
+    expect(p2.hasMore).toBe(false)
+  })
+
+  it('pullInventoryLots:customerCode/materialCode 过滤;状态字段透传(CONSUMED 也如实给)', async () => {
+    const provider = makeProvider()
+    const acme = await provider.pullInventoryLots({ customerCode: 'CUS-ACME' })
+    expect(acme.items.length).toBe(3)
+    expect(acme.items.some(l => l.status === 'CONSUMED')).toBe(true)
+    const one = await provider.pullInventoryLots({ materialCode: 'ez-usb-c-16p' })
+    expect(one.items.length).toBe(1)
+    expect(one.items[0].lotNo).toBe('L240715')
+    expect(one.items[0].customerCode).toBe('CUS-NOVA')
+  })
+})

@@ -27,6 +27,34 @@ export interface ErpInventory {
   updatedAt?: string
 }
 
+/** R3-7:库存异动(门户 Transactions 数据源;金蝶 NOT_IMPLEMENTED,Lab 供测试数据) */
+export interface ErpInventoryMovement {
+  externalId: string
+  materialCode: string
+  movementType: 'IN' | 'OUT' | 'TRANSFER' | 'ADJUST'
+  qty: DecimalString
+  warehouseCode?: string
+  lotNo?: string
+  customerCode?: string
+  refDocType?: string
+  refDocNo?: string
+  occurredAt: string
+}
+
+/** R3-7:库存批次(门户 Lots 数据源) */
+export interface ErpInventoryLot {
+  externalId: string
+  lotNo: string
+  materialCode: string
+  qty: DecimalString
+  warehouseCode?: string
+  customerCode?: string
+  supplierCode?: string
+  receivedAt?: string
+  expiresAt?: string
+  status?: 'AVAILABLE' | 'HOLD' | 'CONSUMED'
+}
+
 export interface ErpExcess {
   externalId: string
   materialCode: string
@@ -283,6 +311,8 @@ export interface SimulatorDataset {
   receipts: ErpReceipt[]
   workOrders: ErpWorkOrder[]
   salesOrders: ErpSalesOrder[]
+  movements: ErpInventoryMovement[]
+  lots: ErpInventoryLot[]
   scenario: ErpSimScenario
   requestLogs: ErpRequestLog[]
   auditLogs: AuditEntry[]

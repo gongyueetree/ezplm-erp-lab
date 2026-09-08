@@ -90,6 +90,8 @@ export class HttpErpLabProvider implements ErpProvider {
   pullOpenPurchaseOrders = (input?: PullOptions) => this.rpc<any>('pullOpenPurchaseOrders', { input })
   pullWorkOrders = (input?: PullOptions) => this.rpc<any>('pullWorkOrders', { input })
   pullSalesOrders = (input?: PullOptions) => this.rpc<any>('pullSalesOrders', { input })
+  pullInventoryMovements = (input?: PullOptions) => this.rpc<any>('pullInventoryMovements', { input })
+  pullInventoryLots = (input?: PullOptions) => this.rpc<any>('pullInventoryLots', { input })
   createPurchaseOrder = (input: ErpPurchaseOrder, idempotencyKey: string) => this.rpc<any>('createPurchaseOrder', { input, idempotencyKey })
   updateEta = (input: ErpEtaUpdate) => this.rpc<any>('updateEta', { input })
   receivePurchaseOrder = (input: ErpReceiveInput, idempotencyKey: string) => this.rpc<any>('receivePurchaseOrder', { input, idempotencyKey })

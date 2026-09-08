@@ -12,6 +12,8 @@ import type {
   ErpExcess,
   ErpExchangeRate,
   ErpInventory,
+  ErpInventoryLot,
+  ErpInventoryMovement,
   ErpMaterial,
   ErpPurchaseOrder,
   ErpSalesOrder,
@@ -132,5 +134,22 @@ export function memQueryWorkOrders(rows: ErpWorkOrder[], q: PageQuery): PagedRow
 
 export function memQuerySalesOrders(rows: ErpSalesOrder[], q: PageQuery): PagedRows<ErpSalesOrder> {
   const out = q.customerCode ? rows.filter(r => eq(r.customerCode, q.customerCode)) : rows
+  return slicePage(out, q)
+}
+
+export function memQueryMovements(rows: ErpInventoryMovement[], q: PageQuery): PagedRows<ErpInventoryMovement> {
+  let out = rows
+  if (q.customerCode) out = out.filter(r => eq(r.customerCode, q.customerCode))
+  if (q.materialCode) out = out.filter(r => eq(r.materialCode, q.materialCode))
+  if (q.warehouseCode) out = out.filter(r => eq(r.warehouseCode, q.warehouseCode))
+  if (q.updatedSince) out = out.filter(r => r.occurredAt >= q.updatedSince!)
+  return slicePage(out, q)
+}
+
+export function memQueryLots(rows: ErpInventoryLot[], q: PageQuery): PagedRows<ErpInventoryLot> {
+  let out = rows
+  if (q.customerCode) out = out.filter(r => eq(r.customerCode, q.customerCode))
+  if (q.materialCode) out = out.filter(r => eq(r.materialCode, q.materialCode))
+  if (q.warehouseCode) out = out.filter(r => eq(r.warehouseCode, q.warehouseCode))
   return slicePage(out, q)
 }
