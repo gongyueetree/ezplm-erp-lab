@@ -6,6 +6,7 @@ import type {
   ErpExcess,
   ErpInventory,
   ErpInventoryLot,
+  ErpMaterialMfgMapping,
   ErpInventoryMovement,
   ErpMaterial,
   ErpPullPage,
@@ -39,6 +40,8 @@ export interface ErpProvider {
   /** R3-7:库存异动/批次(门户 Transactions/Lots 数据源) */
   pullInventoryMovements(input?: PullOptions): Promise<ErpPullPage<ErpInventoryMovement>>
   pullInventoryLots(input?: PullOptions): Promise<ErpPullPage<ErpInventoryLot>>
+  /** R4-10:Internal PN ↔ MFG/MPN 关系拉取(主仓 PartMfgMapping 的 ERP 侧数据源) */
+  pullMaterialMfgMappings(input?: PullOptions): Promise<ErpPullPage<ErpMaterialMfgMapping>>
   createPurchaseOrder(input: ErpPurchaseOrder, idempotencyKey: string): Promise<ErpWriteResult>
   updateEta(input: ErpEtaUpdate): Promise<ErpWriteResult>
   receivePurchaseOrder(input: ErpReceiveInput, idempotencyKey: string): Promise<ErpWriteResult>

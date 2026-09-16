@@ -27,6 +27,7 @@ model ErpSimTenant {
   salesOrders      ErpSimSalesOrder[]
   movements        ErpSimMovement[]
   lots             ErpSimLot[]
+  materialMfgMaps  ErpSimMaterialMfgMap[]
   scenario         ErpSimScenario?
   requestLogs      ErpSimRequestLog[]
   auditLogs        ErpSimAuditLog[]
@@ -330,6 +331,29 @@ model ErpSimLot {
   @@unique([tenantId, externalId])
   @@index([tenantId, materialCode])
   @@index([tenantId, customerCode])
+}
+
+/// R4-10:Internal PN ↔ MFG/MPN 关系(canonical 化的模拟数据;解析在主仓)
+model ErpSimMaterialMfgMap {
+  id               String       @id @default(cuid())
+  tenantId         String
+  tenant           ErpSimTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId       String
+  materialCode     String
+  internalPn       String?
+  manufacturer     String?
+  mpn              String
+  relationType     String?
+  status           String?
+  source           String
+  sourceDocumentNo String?
+  sourceRow        Int?
+  observedAt       DateTime?
+  sourceUpdatedAt  DateTime?
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, materialCode])
+  @@index([tenantId, mpn])
 }
 
 model ErpSimScenario {
