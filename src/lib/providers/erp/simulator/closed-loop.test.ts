@@ -148,3 +148,18 @@ describe('R3-7 · 库存异动/批次(门户 Transactions/Lots 数据源)', () =
     expect(one.items[0].customerCode).toBe('CUS-NOVA')
   })
 })
+
+describe('R4-10 · Material MFG Mapping(主仓 PartMfgMapping 的 ERP 侧数据源)', () => {
+  it('pullMaterialMfgMappings:分页信封;materialCode 过滤;一料多厂/一厂多料/PCB 特征在种子中体现', async () => {
+    const provider = makeProvider()
+    const all = await provider.pullMaterialMfgMappings({})
+    expect(all.total).toBe(4)
+    expect(typeof all.hasMore).toBe('boolean')
+    const one = await provider.pullMaterialMfgMappings({ materialCode: 'EZ-C-100N-0402' })
+    expect(one.items.length).toBe(2) // 一料多厂
+    expect(new Set(one.items.map(m => m.mpn)).size).toBe(2)
+    const pcb = await provider.pullMaterialMfgMappings({ materialCode: 'EZ-PCB-MAIN4L' })
+    expect(pcb.items[0].mpn).toBe('PCB-MAIN-4L-V2') // 板号语义由主仓分类,Lab 只透传
+    expect(pcb.items[0].source).toBe('ERP_MFG_MAINTENANCE')
+  })
+})

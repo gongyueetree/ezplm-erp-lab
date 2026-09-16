@@ -12,6 +12,7 @@ import type {
   ErpPullPage,
   ErpReceiveInput,
   ErpInventoryLot,
+  ErpMaterialMfgMapping,
   ErpInventoryMovement,
   ErpSalesOrder,
   ErpSimScenario,
@@ -186,6 +187,11 @@ export class KingdeeSimulatorProvider implements ErpProvider {
   async pullInventoryLots(input: PullOptions = {}): Promise<ErpPullPage<ErpInventoryLot>> {
     const q = toPageQuery(input)
     return this.executePull('pullInventoryLots', input, async () => pageEnvelope(await this.partialPage(await this.repository.queryLots(q)), q), q)
+  }
+
+  async pullMaterialMfgMappings(input: PullOptions = {}): Promise<ErpPullPage<ErpMaterialMfgMapping>> {
+    const q = toPageQuery(input)
+    return this.executePull('pullMaterialMfgMappings', input, async () => pageEnvelope(await this.partialPage(await this.repository.queryMaterialMfgMappings(q)), q), q)
   }
 
   /** PARTIAL_RESPONSE 场景:当前页砍半(与旧语义一致,只作用于返回条数) */

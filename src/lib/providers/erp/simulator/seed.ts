@@ -57,6 +57,12 @@ export function createSeedDataset(tenantId: string): SimulatorDataset {
       { externalId: 'MV-003', materialCode: 'EZ-USB-C-16P', movementType: 'IN', qty: '4000', warehouseCode: 'SZ-RM', customerCode: 'CUS-NOVA', refDocType: 'RECEIPT', refDocNo: 'RCV-88002', occurredAt: '2026-08-25T01:10:00.000Z' },
       { externalId: 'MV-004', materialCode: 'EZ-R-10K-0402', movementType: 'ADJUST', qty: '-500', warehouseCode: 'SZ-RM', refDocType: 'STOCKTAKE', refDocNo: 'ST-0912', occurredAt: '2026-09-01T09:00:00.000Z' },
     ],
+    materialMfgMappings: [
+      { externalId: 'MFGM-001', materialCode: 'EZ-C-100N-0402', mpn: 'GRM155R71C104KA88D', manufacturer: 'Murata', relationType: 'MAINTAINED', status: 'CANDIDATE', source: 'ERP_MFG_MAINTENANCE', sourceDocumentNo: 'MFG-DOC-1', updatedAt: now },
+      { externalId: 'MFGM-002', materialCode: 'EZ-C-100N-0402', mpn: 'CL05B104KO5NNNC', manufacturer: 'Samsung Electro-Mechanics', relationType: 'ALTERNATE', status: 'CANDIDATE', source: 'ERP_MFG_MAINTENANCE', sourceDocumentNo: 'MFG-DOC-1', updatedAt: now },
+      { externalId: 'MFGM-003', materialCode: 'EZ-R-10K-0402', mpn: 'RC0402FR-0710KL', manufacturer: 'YAGEO(国巨)', relationType: 'MAINTAINED', status: 'CANDIDATE', source: 'ERP_MFG_MAINTENANCE', sourceDocumentNo: 'MFG-DOC-2', updatedAt: now },
+      { externalId: 'MFGM-004', materialCode: 'EZ-PCB-MAIN4L', mpn: 'PCB-MAIN-4L-V2', manufacturer: '示例板厂', relationType: 'MAINTAINED', status: 'CANDIDATE', source: 'ERP_MFG_MAINTENANCE', sourceDocumentNo: 'MFG-DOC-3', updatedAt: now },
+    ],
     lots: [
       { externalId: 'LOT-001', lotNo: 'L240812', materialCode: 'EZ-STM32H743', qty: '380', warehouseCode: 'SZ-RM', customerCode: 'CUS-ACME', supplierCode: 'SUP-DIGIKEY', receivedAt: '2026-08-12', expiresAt: '2028-08-12', status: 'AVAILABLE' },
       { externalId: 'LOT-002', lotNo: 'L240921', materialCode: 'EZ-ADS131M04', qty: '450', warehouseCode: 'SZ-RM', customerCode: 'CUS-ACME', supplierCode: 'SUP-MOUSER', receivedAt: '2026-09-21', status: 'AVAILABLE' },

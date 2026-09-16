@@ -27,6 +27,23 @@ export interface ErpInventory {
   updatedAt?: string
 }
 
+/** R4-10(主仓 R4-2 配套):Internal PN ↔ MFG/MPN 关系(金蝶「物料MFG维护单」语义)。
+ * 乾创字段解析在主仓 Integration Agent;Lab 只接收 canonical 化的模拟数据(§56)。 */
+export interface ErpMaterialMfgMapping {
+  externalId: string
+  materialCode: string
+  internalPn?: string
+  manufacturer?: string
+  mpn: string
+  relationType?: string
+  status?: string
+  source: string
+  sourceDocumentNo?: string
+  sourceRow?: number
+  observedAt?: string
+  updatedAt?: string
+}
+
 /** R3-7:库存异动(门户 Transactions 数据源;金蝶 NOT_IMPLEMENTED,Lab 供测试数据) */
 export interface ErpInventoryMovement {
   externalId: string
@@ -313,6 +330,7 @@ export interface SimulatorDataset {
   salesOrders: ErpSalesOrder[]
   movements: ErpInventoryMovement[]
   lots: ErpInventoryLot[]
+  materialMfgMappings: ErpMaterialMfgMapping[]
   scenario: ErpSimScenario
   requestLogs: ErpRequestLog[]
   auditLogs: AuditEntry[]

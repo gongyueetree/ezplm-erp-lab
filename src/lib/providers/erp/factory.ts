@@ -18,6 +18,7 @@ class NotConfiguredProvider implements ErpProvider {
   pullSalesOrders = this.fail
   pullInventoryMovements = this.fail
   pullInventoryLots = this.fail
+  pullMaterialMfgMappings = this.fail
   createPurchaseOrder = this.fail
   updateEta = this.fail
   receivePurchaseOrder = this.fail

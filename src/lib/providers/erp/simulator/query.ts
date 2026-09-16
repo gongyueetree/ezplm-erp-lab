@@ -13,6 +13,7 @@ import type {
   ErpExchangeRate,
   ErpInventory,
   ErpInventoryLot,
+  ErpMaterialMfgMapping,
   ErpInventoryMovement,
   ErpMaterial,
   ErpPurchaseOrder,
@@ -151,5 +152,12 @@ export function memQueryLots(rows: ErpInventoryLot[], q: PageQuery): PagedRows<E
   if (q.customerCode) out = out.filter(r => eq(r.customerCode, q.customerCode))
   if (q.materialCode) out = out.filter(r => eq(r.materialCode, q.materialCode))
   if (q.warehouseCode) out = out.filter(r => eq(r.warehouseCode, q.warehouseCode))
+  return slicePage(out, q)
+}
+
+export function memQueryMaterialMfgMappings(rows: ErpMaterialMfgMapping[], q: PageQuery): PagedRows<ErpMaterialMfgMapping> {
+  let out = rows
+  if (q.materialCode) out = out.filter(r => eq(r.materialCode, q.materialCode) || eq(r.internalPn, q.materialCode))
+  if (q.updatedSince) out = out.filter(r => !r.updatedAt || r.updatedAt >= q.updatedSince!)
   return slicePage(out, q)
 }
